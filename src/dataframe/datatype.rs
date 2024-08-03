@@ -46,20 +46,21 @@ macro_rules! impl_data_type_vec {
 
 macro_rules! transparent {
     ($t: ident : $g: ty) => {
-        #[derive(Clone)]
-        pub struct $t($g);
-        impl Deref for $t {
-            type Target = $g;
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
-        impl DerefMut for $t {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.0
-            }
-        }
+        transparent!(@ $t, $g);
+    };
+    ($t: ident : vec $g: ty) => {
+        transparent!(@ $t, Vec<$g>);
+        transparent!(@vec $t, $g);
+    };
 
+    (@ $t: ident, $g: ty) => {
+        #[derive(Clone)]
+        pub struct $t(pub $g);
+        impl From<$t> for $g {
+            fn from(value: $t) -> Self {
+                value.0
+            }
+        }
         impl From<$g> for $t {
             fn from(value: $g) -> Self {
                 Self(value)
@@ -70,6 +71,13 @@ macro_rules! transparent {
         impl Into<rmpv::Value> for $t {
             fn into(self) -> rmpv::Value {
                 self.0.into()
+            }
+        }
+    };
+    (@vec $t: ident, $i: ty) => {
+        impl FromIterator<$i> for $t {
+            fn from_iter<I: IntoIterator<Item = $i>>(iter: I) -> Self {
+                iter.into_iter().collect::<Vec<$i>>().into()
             }
         }
     };
@@ -149,10 +157,9 @@ pub trait NetworkTableDataType: Clone {
 }
 
 transparent!(JsonString: String);
-transparent!(RawData: Vec<u8>);
-transparent!(Rpc: Vec<u8>);
-// TODO: actual protobuf support
-transparent!(Protobuf: Vec<u8>);
+transparent!(RawData: vec u8);
+transparent!(Rpc: vec u8);
+transparent!(Protobuf: vec u8);
 
 impl_data_type! [(value)
     bool => Boolean; value.as_bool(),
