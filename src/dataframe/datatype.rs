@@ -1,46 +1,78 @@
-use std::ops::{Deref,DerefMut};
-
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 
+// holy macro
 macro_rules! impl_data_type {
-    (($v: ident) $($t: ty => $d: expr ; $f: expr),+ $(,)?) => {
-        $(
-            impl NetworkTableDataType for $t {
-                fn data_type() -> DataType {
-                    use DataType::*;
-                    $d
-                }
-                fn from_value(value: &rmpv::Value) -> Option<Self> {
-                    #[allow(unused_variables)]
-                    let $v = value;
-                    $f
-                }
-                fn into_value(self) -> rmpv::Value {
-                    self.into()
-                }
-            }
-        )+
+    // T (and vec<T>) to data type with from<data type> -> T impl
+    ($t: ty $([vec => $a: expr])? => $d: expr ; $v: ident @ $f: expr) => {
+        impl_data_type!(@ $t, $d, [$v]{ $f });
+        $( impl_data_type!(vec $t => $a; $v @ { $f }); )?
     };
-}
 
-macro_rules! impl_data_type_vec {
-    (($v: ident) $($t: ty => $d: expr ; $f: expr),+ $(,)?) => {
-        $(
-            impl NetworkTableDataType for $t {
-                fn data_type() -> DataType {
-                    use DataType::*;
-                    $d
-                }
-                fn from_value(value: &rmpv::Value) -> Option<Self> {
-                    #[allow(unused_variables)]
-                    let $v = value;
-                    $f
-                }
-                fn into_value(self) -> rmpv::Value {
-                    rmpv::Value::from_iter(self)
-                }
+    // T (and vec<T>) to data type with from<data type> -> T impl (block)
+    ($t: ty $([vec => $a: expr])? => $d: expr ; $v: ident @ $f: block) => {
+        impl_data_type!(@ $t, $d, [$v]$f);
+        $( impl_data_type!(vec $t => $a; $v @ { $f }); )?
+    };
+
+    // int (and vec<int>) to data type
+    ($t: ty $([vec => $a: expr])? => $d: expr ; i) => {
+        impl_data_type!(@ $t, $d, [value] value.as_i64());
+        $( impl_data_type!(vec $t => $a; value @ { value.as_i64().and_then(|value| value.try_into().ok()) }); )?
+    };
+    // uint (and vec<uint>) to data type
+    ($t: ty $([vec => $a: expr])? => $d: expr ; u) => {
+        impl_data_type!(@ $t, $d, [value] value.as_u64());
+        $( impl_data_type!(vec $t => $a; value @ { value.as_u64().and_then(|value| value.try_into().ok()) }); )?
+    };
+
+    // some_wrapper(vec<T>) to data type with mapper from value to T
+    (vec($i: ty) $t: ty => $d: expr ; $v: ident @ $c: block) => {
+        impl_data_type!(@ $t, $d, [value]{
+            let vec = value.as_array()?;
+            vec.iter()
+                .map(|$v| $c)
+                .collect::<Option<$t>>()
+        }, [this]{
+            let vec: Vec<$i> = this.into();
+            rmpv::Value::from_iter(vec)
+        });
+    };
+    // vec<T> to data type with mapper from value to T
+    (vec $i: ty => $d: expr ; $v: ident @ $c: block) => {
+        impl_data_type!(@ Vec<$i>, $d, [value]{
+            let vec = value.as_array()?;
+            vec.iter()
+                .map(|$v| $c)
+                .collect::<Option<Vec<$i>>>()
+        }, [this]{ rmpv::Value::from_iter(this) });
+    };
+    // some_wrapper(vec<u8>) to data type
+    (bytes $t: ty => $d: expr) => {
+        impl_data_type!(vec(u8) $t => $d ; value @ {
+            value.as_u64().and_then(|value| value.try_into().ok())
+        });
+    };
+
+    // INTERNAL generic impl with some from logic without custom into logic
+    (@ $t: ty, $d: expr, [ $v: ident ] $a: expr) => {
+        impl_data_type!(@ $t, $d, [$v]{ $a.and_then(|value| value.try_into().ok()) }, [this]{ this.into() });
+    };
+    // INTERNAL generic impl with custom from and into logic
+    (@ $t: ty, $d: expr, [ $v: ident ] $f: block, [ $s: ident ] $i: block) => {
+        impl NetworkTableDataType for $t {
+            fn data_type() -> DataType {
+                use DataType::*;
+                $d
             }
-        )+
+            #[allow(unused_variables)]
+            fn from_value($v: &rmpv::Value) -> Option<Self> {
+                $f
+            }
+            fn into_value(self) -> rmpv::Value {
+                let $s = self;
+                $i
+            }
+        }
     };
 }
 
@@ -161,35 +193,23 @@ transparent!(RawData: vec u8);
 transparent!(Rpc: vec u8);
 transparent!(Protobuf: vec u8);
 
-impl_data_type! [(value)
-    bool => Boolean; value.as_bool(),
-    f64 => Double; value.as_f64(),
-    i8 => Int; value.as_i64().and_then(|num| num.try_into().ok()),
-    i16 => Int; value.as_i64().and_then(|num| num.try_into().ok()),
-    i32 => Int; value.as_i64().and_then(|num| num.try_into().ok()),
-    i64 => Int; value.as_i64(),
-    u8 => Int; value.as_u64().and_then(|num| num.try_into().ok()),
-    u16 => Int; value.as_u64().and_then(|num| num.try_into().ok()),
-    u32 => Int; value.as_u64().and_then(|num| num.try_into().ok()),
-    u64 => Int; value.as_u64(),
-    f32 => Float; value.as_f64().map(|num| num as f32),
-    String => String; value.as_str().map(|str| str.to_owned()),
-    // &str => String; value.as_str(),
-    JsonString => Json; value.as_str().map(|str| str.to_owned().into()),
-    // TODO: fix binary from_value impls
-    RawData => Raw; None,
-    Rpc => Rpc; None,
-    rmpv::Value => Msgpack; Some(value.clone()),
-    Protobuf => Protobuf; None,
-];
-// TODO: fix array from_value impls
-impl_data_type_vec! [(value)
-    Vec<bool> => BooleanArray; None,
-    Vec<f64> => DoubleArray; None,
-    Vec<i32> => IntArray; None,
-    Vec<f32> => FloatArray; None,
-    Vec<String> => StringArray; None,
-];
+impl_data_type!(bool [vec => BooleanArray] => Boolean; value @ value.as_bool());
+impl_data_type!(f64 [vec => DoubleArray] => Double; value @ value.as_f64());
+impl_data_type!(i8 [vec => IntArray] => Int; i);
+impl_data_type!(i16 [vec => IntArray] => Int; i);
+impl_data_type!(i32 [vec => IntArray] => Int; i);
+impl_data_type!(i64 [vec => IntArray] => Int; value @ value.as_i64());
+impl_data_type!(u8 [vec => IntArray] => Int; u);
+impl_data_type!(u16 [vec => IntArray] => Int; u);
+impl_data_type!(u32 [vec => IntArray] => Int; u);
+impl_data_type!(u64 [vec => IntArray] => Int; value @ value.as_u64());
+impl_data_type!(f32 [vec => FloatArray] => Float; value @ value.as_f64().map(|num| num as f32));
+impl_data_type!(String [vec => StringArray] => String; value @ value.as_str().map(|str| str.to_owned()));
+impl_data_type!(JsonString => Json; value @ value.as_str().map(|str| JsonString(str.to_owned())));
+impl_data_type!(bytes RawData => Raw);
+impl_data_type!(bytes Rpc => Rpc);
+impl_data_type!(rmpv::Value => Msgpack; value @ Some(value.clone()));
+impl_data_type!(bytes Protobuf => Protobuf);
 
 pub fn serialize_as_u32<S>(data_type: &DataType, serializer: S) -> Result<S::Ok, S::Error>
 where S: Serializer
