@@ -79,16 +79,16 @@ macro_rules! impl_data_type {
 }
 
 macro_rules! transparent {
-    ($t: ident : $g: ty) => {
-        transparent!(@ $t, $g);
+    ($(#[$m: meta])* $t: ident : $g: ty) => {
+        transparent!(@ $t, $($m)*, $g);
     };
-    ($t: ident : vec $g: ty) => {
-        transparent!(@ $t, Vec<$g>);
+    ($(#[$m: meta])* $t: ident : vec $g: ty) => {
+        transparent!(@ $t, $($m)*, Vec<$g>);
         transparent!(@vec $t, $g);
     };
 
-    (@ $t: ident, $g: ty) => {
-        #[derive(Clone)]
+    (@ $t: ident, $($m: meta)*, $g: ty) => {
+        $(#[$m])*
         pub struct $t(pub $g);
         impl From<$t> for $g {
             fn from(value: $t) -> Self {
@@ -232,10 +232,26 @@ pub trait NetworkTableData: Clone {
     fn into_value(self) -> rmpv::Value;
 }
 
-transparent!(JsonString: String);
-transparent!(RawData: vec u8);
-transparent!(Rpc: vec u8);
-transparent!(Protobuf: vec u8);
+transparent!(
+    /// A JSON string.
+    #[derive(Clone, Debug)]
+    JsonString: String
+);
+transparent!(
+    /// Raw binary data.
+    #[derive(Clone, Debug)]
+    RawData: vec u8
+);
+transparent!(
+    /// Raw RPC data.
+    #[derive(Clone, Debug)]
+    Rpc: vec u8
+);
+transparent!(
+    /// Raw protobuf data.
+    #[derive(Clone, Debug)]
+    Protobuf: vec u8
+);
 
 impl_data_type!(bool [vec => BooleanArray] => Boolean; value @ value.as_bool());
 impl_data_type!(f64 [vec => DoubleArray] => Double; value @ value.as_f64());
