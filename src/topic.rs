@@ -18,14 +18,21 @@ use crate::{dataframe::{datatype::NetworkTableData, Properties, SubscriptionOpti
 pub struct Topic {
     name: String,
     time: Arc<RwLock<NetworkTablesTime>>,
+    response_timeout: Duration,
     send_ws: NTServerSender,
     recv_ws: NTClientSender,
 }
 
 impl Topic {
     // NOTE: pub(super) or just pub?
-    pub(super) fn new(name: String, time: Arc<RwLock<NetworkTablesTime>>, send_ws: NTServerSender, recv_ws: NTClientSender) -> Self {
-        Self { name, time, send_ws, recv_ws }
+    pub(super) fn new(
+        name: String,
+        time: Arc<RwLock<NetworkTablesTime>>,
+        response_timeout: Duration,
+        send_ws: NTServerSender,
+        recv_ws: NTClientSender,
+    ) -> Self {
+        Self { name, time, response_timeout, send_ws, recv_ws }
     }
 
     /// Publishes to this topic with the data type `T`.
@@ -37,7 +44,7 @@ impl Topic {
     ///
     /// [`Client`]: crate::Client
     pub async fn publish<T: NetworkTableData>(&self, properties: Properties) -> Result<Publisher<T>, NewPublisherError> {
-        Publisher::new(self.name.clone(), properties, self.time.clone(), self.send_ws.clone(), self.recv_ws.subscribe()).await
+        Publisher::new(self.name.clone(), properties, self.time.clone(), self.response_timeout, self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 
     /// Subscribes to this topic with the data type `T`.

@@ -70,16 +70,15 @@ pub struct Client {
     name: String,
     time: Arc<RwLock<NetworkTablesTime>>,
 
+    response_timeout: Duration,
+    ping_interval: Duration,
+    update_time_interval: Duration,
+
     send_ws: (NTServerSender, NTServerReceiver),
     recv_ws: (NTClientSender, NTClientReceiver),
 }
 
 impl Client {
-    pub const PING_INTERVAL: Duration = Duration::from_millis(200);
-    pub const PONG_TIMEOUT: Duration = Duration::from_secs(1);
-
-    pub const UPDATE_TIME_INTERVAL: Duration = Duration::from_secs(5);
-
     /// Creates a new `Client` with options.
     ///
     /// # Panics
@@ -91,6 +90,10 @@ impl Client {
             addr: SocketAddrV4::new(addr, options.port),
             name: options.name,
             time: Default::default(),
+
+            response_timeout: options.response_timeout,
+            ping_interval: options.ping_interval,
+            update_time_interval: options.update_time_interval,
 
             send_ws: broadcast::channel(10),
             recv_ws: broadcast::channel(20),
@@ -106,7 +109,7 @@ impl Client {
 
     /// Returns a new topic with a given name.
     pub fn topic(&self, name: impl ToString) -> Topic {
-        Topic::new(name.to_string(), self.time(), self.send_ws.0.clone(), self.recv_ws.0.clone())
+        Topic::new(name.to_string(), self.time(), self.response_timeout, self.send_ws.0.clone(), self.recv_ws.0.clone())
     }
 
     /// Connects to the `NetworkTables` server.
@@ -125,14 +128,14 @@ impl Client {
         let pong_notify_send = pong_notify_recv.clone();
         // TODO: split tasks into their own methods
         let interval_ping = tokio::spawn(async move {
-            sleep(Self::PING_INTERVAL).await;
+            sleep(self.ping_interval).await;
 
-            let mut interval = interval(Self::PING_INTERVAL);
+            let mut interval = interval(self.ping_interval);
             loop {
                 interval.tick().await;
                 ping_task_ws_sender.send(ServerboundMessage::Ping.into()).expect("receiver still exists");
 
-                if (timeout(Self::PONG_TIMEOUT, pong_notify_recv.notified()).await).is_err() {
+                if (timeout(self.response_timeout, pong_notify_recv.notified()).await).is_err() {
                     // TODO: reconnect instead of panicking
                     panic!("pong not received within 1 second! terminating connection");
                 }
@@ -142,7 +145,7 @@ impl Client {
         let (update_time_sender, mut update_time_recv) = mpsc::channel(1);
         let update_time_ws = self.send_ws.0.clone();
         let update_time = tokio::spawn(async move {
-            let mut interval = interval(Self::UPDATE_TIME_INTERVAL);
+            let mut interval = interval(self.update_time_interval);
             loop {
                 interval.tick().await;
 
@@ -248,11 +251,33 @@ pub struct NewClientOptions {
     ///
     /// Default is `rust-client-{random u16}`
     pub name: String,
+    /// The timeout for a server response.
+    ///
+    /// If this timeout gets exceeded when a server response is expected, such as in PING requests,
+    /// the client will close the connection and attempt to reconnect.
+    ///
+    /// Default is 1s.
+    pub response_timeout: Duration,
+    /// The interval at which to send ping messages.
+    ///
+    /// Default is 200ms.
+    pub ping_interval: Duration,
+    /// The interval at which to update server time.
+    ///
+    /// Default is 5s.
+    pub update_time_interval: Duration,
 }
 
 impl Default for NewClientOptions {
     fn default() -> Self {
-        Self { addr: Default::default(), port: 5810, name: format!("rust-client-{}", rand::random::<u16>()) }
+        Self {
+            addr: Default::default(),
+            port: 5810,
+            name: format!("rust-client-{}", rand::random::<u16>()),
+            response_timeout: Duration::from_secs(1),
+            ping_interval: Duration::from_millis(200),
+            update_time_interval: Duration::from_secs(5),
+        }
     }
 }
 

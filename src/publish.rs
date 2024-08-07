@@ -28,6 +28,7 @@ impl<T: NetworkTableData> Publisher<T> {
         name: String,
         properties: Properties,
         time: Arc<RwLock<NetworkTablesTime>>,
+        timeout_duration: Duration,
         ws_sender: NTServerSender,
         mut ws_recv: NTClientReceiver,
     ) -> Result<Self, NewPublisherError> {
@@ -35,7 +36,7 @@ impl<T: NetworkTableData> Publisher<T> {
         let pub_message = ServerboundTextData::Publish(Publish { name, pubuid: id, r#type: T::data_type(), properties });
         ws_sender.send(ServerboundMessage::Text(pub_message).into()).map_err(|_| ConnectionClosedError)?;
 
-        let (r#type, id) = timeout(Duration::from_secs(1), Self::wait_for_response(&mut ws_recv)).await.map_err(|_| NewPublisherError::NoResponse)??;
+        let (r#type, id) = timeout(timeout_duration, Self::wait_for_response(&mut ws_recv)).await.map_err(|_| NewPublisherError::NoResponse)??;
         if T::data_type() != r#type { return Err(NewPublisherError::MismatchedType(r#type, T::data_type())); };
 
         Ok(Self { _phantom: PhantomData, id, time, ws_sender })
