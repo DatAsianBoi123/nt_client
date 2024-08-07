@@ -271,13 +271,13 @@ impl_data_type!(bytes Rpc => Rpc);
 impl_data_type!(rmpv::Value => Msgpack; value @ Some(value.clone()));
 impl_data_type!(bytes Protobuf => Protobuf);
 
-pub fn serialize_as_u32<S>(data_type: &DataType, serializer: S) -> Result<S::Ok, S::Error>
+pub(super) fn serialize_as_u32<S>(data_type: &DataType, serializer: S) -> Result<S::Ok, S::Error>
 where S: Serializer
 {
     serializer.serialize_u32(data_type.as_id())
 }
 
-pub fn deserialize_u32<'de, D>(deserializer: D) -> Result<DataType, D::Error>
+pub(super) fn deserialize_u32<'de, D>(deserializer: D) -> Result<DataType, D::Error>
 where D: Deserializer<'de>
 {
     deserializer.deserialize_u32(DataTypeVisitor)
