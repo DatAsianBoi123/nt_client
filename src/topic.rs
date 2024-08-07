@@ -6,7 +6,7 @@ use std::{sync::Arc, time::Duration};
 
 use tokio::sync::RwLock;
 
-use crate::{dataframe::{datatype::NetworkTableDataType, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::{NewSubscriberError, Subscriber}, NTClientSender, NTServerSender, NetworkTablesTime};
+use crate::{dataframe::{datatype::NetworkTableData, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::{NewSubscriberError, Subscriber}, NTClientSender, NTServerSender, NetworkTablesTime};
 
 /// Represents a `NetworkTables` topic.
 ///
@@ -36,7 +36,7 @@ impl Topic {
     /// requires running this method in a separate thread, through something like [`tokio::spawn`].
     ///
     /// [`Client`]: crate::Client
-    pub async fn publish<T: NetworkTableDataType>(&self, properties: Properties) -> Result<Publisher<T>, NewPublisherError> {
+    pub async fn publish<T: NetworkTableData>(&self, properties: Properties) -> Result<Publisher<T>, NewPublisherError> {
         Publisher::new(self.name.clone(), properties, self.time.clone(), self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 
@@ -48,7 +48,7 @@ impl Topic {
     /// requires running this method in a separate thread, through something like [`tokio::spawn`].
     ///
     /// [`Client`]: crate::Client
-    pub async fn subscribe<T: NetworkTableDataType>(&self, options: SubscriptionOptions) -> Result<Subscriber<T>, NewSubscriberError> {
+    pub async fn subscribe<T: NetworkTableData>(&self, options: SubscriptionOptions) -> Result<Subscriber<T>, NewSubscriberError> {
         Subscriber::new(vec![self.name.clone()], options, self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 

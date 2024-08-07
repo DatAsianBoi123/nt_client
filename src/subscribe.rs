@@ -1,13 +1,13 @@
 use std::{marker::PhantomData, time::Duration};
 
-use crate::{dataframe::{datatype::{DataType, NetworkTableDataType}, Announce, BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, error::ConnectionClosedError, NTClientReceiver, NTServerSender};
+use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, recv_until, NTClientReceiver, NTServerSender};
 
 /// A `NetworkTables` subscriber that subscribes to a [`Topic`].
 ///
 /// This will automatically get unsubscribed whenever this goes out of scope.
 ///
 /// [`Topic`]: crate::topic::Topic
-pub struct Subscriber<T: NetworkTableDataType> {
+pub struct Subscriber<T: NetworkTableData> {
     _phantom: PhantomData<T>,
     id: i32,
     topic_id: i32,
@@ -18,7 +18,7 @@ pub struct Subscriber<T: NetworkTableDataType> {
 }
 
 // TODO: handle multiple topics being subscribed to
-impl<T: NetworkTableDataType> Subscriber<T> {
+impl<T: NetworkTableData> Subscriber<T> {
     // NOTE: pub(super) or pub?
     pub(super) async fn new(
         topics: Vec<String>,
@@ -73,7 +73,7 @@ impl<T: NetworkTableDataType> Subscriber<T> {
     // TODO: update method
 }
 
-impl<T: NetworkTableDataType> Drop for Subscriber<T> {
+impl<T: NetworkTableData> Drop for Subscriber<T> {
     fn drop(&mut self) {
         let unsub_message = ServerboundTextData::Unsubscribe(Unsubscribe { subuid: self.id });
         // if the receiver is dropped, the ws connection is closed

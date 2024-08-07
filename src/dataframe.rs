@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use datatype::{DataType, NetworkTableDataType};
+use datatype::{DataType, NetworkTableData};
 use serde::{de::Visitor, ser::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 // TODO: rename to `type`
@@ -132,7 +132,7 @@ pub struct BinaryData {
 }
 
 impl BinaryData {
-    pub fn new<T: NetworkTableDataType>(id: i32, timestamp: Duration, data: T) -> Self {
+    pub fn new<T: NetworkTableData>(id: i32, timestamp: Duration, data: T) -> Self {
         Self { id, timestamp, data_type: T::data_type(), data: data.into_value() }
     }
 }

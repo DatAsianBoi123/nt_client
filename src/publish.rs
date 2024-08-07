@@ -8,21 +8,21 @@ use std::{marker::PhantomData, sync::Arc, time::Duration};
 
 use tokio::{sync::RwLock, time::timeout};
 
-use crate::{dataframe::{datatype::{DataType, NetworkTableDataType}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, error::ConnectionClosedError, NTClientReceiver, NTServerSender, NetworkTablesTime};
+use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, recv_until, NTClientReceiver, NTServerSender, NetworkTablesTime};
 
 /// A `NetworkTables` publisher that publishes values to a [`Topic`].
 ///
 /// This will automatically get unpublished whenever this goes out of scope.
 ///
 /// [`Topic`]: crate::topic::Topic
-pub struct Publisher<T: NetworkTableDataType> {
+pub struct Publisher<T: NetworkTableData> {
     _phantom: PhantomData<T>,
     id: i32,
     time: Arc<RwLock<NetworkTablesTime>>,
     ws_sender: NTServerSender,
 }
 
-impl<T: NetworkTableDataType> Publisher<T> {
+impl<T: NetworkTableData> Publisher<T> {
     // NOTE: pub(super) or pub?
     pub(super) async fn new(
         name: String,
@@ -82,7 +82,7 @@ impl<T: NetworkTableDataType> Publisher<T> {
     }
 }
 
-impl<T: NetworkTableDataType> Drop for Publisher<T> {
+impl<T: NetworkTableData> Drop for Publisher<T> {
     fn drop(&mut self) {
         let data = ServerboundTextData::Unpublish(Unpublish { pubuid: self.id });
         // if the receiver is dropped, the ws connection is closed

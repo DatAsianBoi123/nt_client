@@ -61,7 +61,7 @@ macro_rules! impl_data_type {
     };
     // INTERNAL generic impl with custom from and into logic
     (@ $t: ty, $d: expr, [ $v: ident ] $f: block, [ $s: ident ] $i: block) => {
-        impl NetworkTableDataType for $t {
+        impl NetworkTableData for $t {
             fn data_type() -> DataType {
                 use DataType::*;
                 $d
@@ -221,7 +221,7 @@ impl DataType {
 }
 
 /// A piece of data that can be sent and received by a `NetworkTables` server.
-pub trait NetworkTableDataType: Clone {
+pub trait NetworkTableData: Clone {
     /// Returns the `DataType` that this piece of data is.
     fn data_type() -> DataType;
 
