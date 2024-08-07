@@ -6,6 +6,8 @@
 
 use std::{marker::PhantomData, time::Duration};
 
+use tokio::sync::broadcast;
+
 use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, recv_until, NTClientReceiver, NTServerSender};
 
 /// A `NetworkTables` subscriber that subscribes to a [`Topic`].
@@ -36,44 +38,32 @@ impl<T: NetworkTableData> Subscriber<T> {
         let sub_message = ServerboundTextData::Subscribe(Subscribe { topics, subuid: id, options });
         ws_sender.send(ServerboundMessage::Text(sub_message).into()).expect("receivers exist");
 
-        let (r#type, topic_id) = Self::wait_for_response(&mut ws_recv).await?;
-        if T::data_type() != r#type { return Err(NewSubscriberError::MismatchedType(r#type, T::data_type())); };
+        let (r#type, topic_id) = recv_until(&mut ws_recv, |data| {
+            if let ClientboundData::Text(ClientboundTextData::Announce(Announce { id, ref r#type, .. })) = *data {
+                // TODO: handle other properties
+
+                Some((r#type.clone(), id))
+            } else { None }
+        }).await?;
+        if T::data_type() != r#type { return Err(NewSubscriberError::MismatchedType { server: r#type, client: T::data_type() }); };
 
         Ok(Self { _phantom: PhantomData, id, topic_id, prev_timestamp: None, ws_sender, ws_recv })
     }
 
     /// Receives the next value for this subscriber.
-    pub async fn recv(&mut self) -> Result<T, ConnectionClosedError> {
-        while let Ok(data) = self.ws_recv.recv().await {
-            match *data {
-                ClientboundData::Binary(BinaryData { id, ref timestamp, ref data, .. }) => {
-                    if id != self.topic_id { continue; };
-                    let past = if let Some(last_timestamp) = self.prev_timestamp { last_timestamp > *timestamp } else { false };
-                    if past { continue; };
+    pub async fn recv(&mut self) -> Result<T, broadcast::error::RecvError> {
+        recv_until(&mut self.ws_recv, |data| {
+            if let ClientboundData::Binary(BinaryData { id, ref timestamp, ref data, .. }) = *data {
+                if id != self.topic_id { return None; };
+                let past = if let Some(last_timestamp) = self.prev_timestamp { last_timestamp > *timestamp } else { false };
+                if past { return None; };
 
-                    self.prev_timestamp = Some(*timestamp);
-                    return Ok(T::from_value(data).expect("types match up"));
-                },
-                _ => continue,
-            };
-        };
-        // TODO: handle RecvError::Lagged
-        Err(ConnectionClosedError)
-    }
-
-    async fn wait_for_response(recv_ws: &mut NTClientReceiver) -> Result<(DataType, i32), ConnectionClosedError> {
-        while let Ok(data) = recv_ws.recv().await {
-            match *data {
-                ClientboundData::Text(ClientboundTextData::Announce(Announce { id, ref r#type, .. })) => {
-                    // TODO: cached property
-
-                    return Ok((r#type.clone(), id));
-                },
-                _ => continue,
-            };
-        };
-        // TODO: handle RecvError::Lagged
-        Err(ConnectionClosedError)
+                self.prev_timestamp = Some(*timestamp);
+                Some(T::from_value(data).expect("types match up"))
+            } else {
+                None
+            }
+        }).await
     }
 
     // TODO: update method
@@ -91,8 +81,9 @@ impl<T: NetworkTableData> Drop for Subscriber<T> {
 /// Errors that can occur when creating a new [`Subscriber`].
 #[derive(thiserror::Error, Debug)]
 pub enum NewSubscriberError {
+    /// An error occurred when receiving data from the connection.
     #[error(transparent)]
-    ConnectionClosed(#[from] ConnectionClosedError),
+    Recv(#[from] broadcast::error::RecvError),
     /// The server and client have mismatched data types.
     ///
     /// This can occur if, for example, the client is subscribing to a topic and expecting

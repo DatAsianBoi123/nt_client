@@ -369,3 +369,14 @@ impl NetworkTablesTime {
     }
 }
 
+// TODO: custom `RecvError` struct instead of using tokio one?
+pub(crate) async fn recv_until<T, F>(recv_ws: &mut NTClientReceiver, mut filter: F) -> Result<T, broadcast::error::RecvError>
+where F: FnMut(Arc<ClientboundData>) -> Option<T>
+{
+    loop {
+        if let Some(data) = filter(recv_ws.recv().await?) {
+            return Ok(data);
+        }
+    };
+}
+

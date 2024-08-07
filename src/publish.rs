@@ -6,7 +6,7 @@
 
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
-use tokio::{sync::RwLock, time::timeout};
+use tokio::{sync::{broadcast, RwLock}, time::timeout};
 
 use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, recv_until, NTClientReceiver, NTServerSender, NetworkTablesTime};
 
@@ -34,10 +34,20 @@ impl<T: NetworkTableData> Publisher<T> {
     ) -> Result<Self, NewPublisherError> {
         let id = rand::random();
         let pub_message = ServerboundTextData::Publish(Publish { name, pubuid: id, r#type: T::data_type(), properties });
-        ws_sender.send(ServerboundMessage::Text(pub_message).into()).map_err(|_| ConnectionClosedError)?;
+        ws_sender.send(ServerboundMessage::Text(pub_message).into()).map_err(|_| broadcast::error::RecvError::Closed)?;
 
-        let (r#type, id) = timeout(timeout_duration, Self::wait_for_response(&mut ws_recv)).await.map_err(|_| NewPublisherError::NoResponse)??;
-        if T::data_type() != r#type { return Err(NewPublisherError::MismatchedType(r#type, T::data_type())); };
+        let (r#type, id) = timeout(timeout_duration, async move {
+            recv_until(&mut ws_recv, |data| {
+                if let ClientboundData::Text(ClientboundTextData::Announce(Announce { ref r#type, pubuid: Some(pubuid), .. })) = *data {
+                    // TODO: cached property
+
+                    Some((r#type.clone(), pubuid))
+                } else {
+                    None
+                }
+            }).await
+        }).await.map_err(|_| NewPublisherError::NoResponse)??;
+        if T::data_type() != r#type { return Err(NewPublisherError::MismatchedType { server: r#type, client: T::data_type() }); };
 
         Ok(Self { _phantom: PhantomData, id, time, ws_sender })
     }
@@ -66,21 +76,6 @@ impl<T: NetworkTableData> Publisher<T> {
         self.ws_sender.send(ServerboundMessage::Binary(binary).into()).expect("receiver still exists");
         println!("[pub {}] set value to {data_value}", self.id)
     }
-
-    async fn wait_for_response(recv_ws: &mut NTClientReceiver) -> Result<(DataType, i32), ConnectionClosedError> {
-        while let Ok(data) = recv_ws.recv().await {
-            match *data {
-                ClientboundData::Text(ClientboundTextData::Announce(Announce { ref r#type, pubuid: Some(pubuid), .. })) => {
-                    // TODO: cached property
-
-                    return Ok((r#type.clone(), pubuid));
-                },
-                _ => continue,
-            }
-        }
-        // TODO: handle RecvError::Lagged
-        Err(ConnectionClosedError)
-    }
 }
 
 impl<T: NetworkTableData> Drop for Publisher<T> {
@@ -95,13 +90,14 @@ impl<T: NetworkTableData> Drop for Publisher<T> {
 /// Errors that can occur when creating a new [`Publisher`].
 #[derive(thiserror::Error, Debug)]
 pub enum NewPublisherError {
+    /// An error occurred when receiving data from the connection.
+    #[error(transparent)]
+    Recv(#[from] broadcast::error::RecvError),
     /// The server didn't respond to the publish within the response timeout specified in [`NewClientOptions`].
     ///
     /// [`NewClientOptions`]: crate::NewClientOptions
     #[error("server didn't respond with announce")]
     NoResponse,
-    #[error(transparent)]
-    ConnectionClosed(#[from] ConnectionClosedError),
     /// The server and client have mismatched data types.
     ///
     /// This can occur if, for example, the client is publishing [`String`]s to a topic that the
