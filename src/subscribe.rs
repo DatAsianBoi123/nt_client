@@ -1,3 +1,9 @@
+// TODO: example in doc
+
+//! Subscriber portion of the `NetworkTables` spec.
+//!
+//! Subscribers receive data value updates to a topic.
+
 use std::{marker::PhantomData, time::Duration};
 
 use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, recv_until, NTClientReceiver, NTServerSender};
