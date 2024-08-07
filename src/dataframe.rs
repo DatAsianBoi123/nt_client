@@ -97,7 +97,7 @@ impl From<ClientboundDataFrame> for Vec<ClientboundData> {
 pub enum ClientboundTextData {
     Announce(Announce),
     Unannounce(Unannounce),
-    Properties(PropertiesTextFrame),
+    Properties(PropertiesData),
 }
 
 #[derive(Deserialize, Debug)]
@@ -116,7 +116,7 @@ pub struct Unannounce {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct PropertiesTextFrame {
+pub struct PropertiesData {
     pub name: String,
     pub ack: Option<bool>,
 }
