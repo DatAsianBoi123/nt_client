@@ -124,7 +124,7 @@ pub struct PropertiesData {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BinaryData {
     pub id: i32,
-    #[serde(serialize_with = "serialize_dur_as_u32", deserialize_with = "deserialize_u32_as_dur")]
+    #[serde(serialize_with = "serialize_dur_as_micros", deserialize_with = "deserialize_micros_as_dur")]
     pub timestamp: Duration,
     #[serde(serialize_with = "datatype::serialize_as_u32", deserialize_with = "datatype::deserialize_u32")]
     pub data_type: DataType,
@@ -217,21 +217,21 @@ pub struct SubscriptionOptions {
     pub extra: Option<HashMap<String, serde_json::Value>>,
 }
 
-fn serialize_dur_as_u32<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_dur_as_micros<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
 where S: Serializer
 {
     serializer.serialize_u32(duration.as_micros().try_into().map_err(S::Error::custom)?)
 }
 
-fn deserialize_u32_as_dur<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+fn deserialize_micros_as_dur<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where D: Deserializer<'de>
 {
-    deserializer.deserialize_u32(DurationVisitor)
+    deserializer.deserialize_u32(DurationMicrosVisitor)
 }
 
-struct DurationVisitor;
+struct DurationMicrosVisitor;
 
-impl<'de> Visitor<'de> for DurationVisitor {
+impl<'de> Visitor<'de> for DurationMicrosVisitor {
     type Value = Duration;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
