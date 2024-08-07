@@ -136,33 +136,75 @@ impl BinaryData {
     }
 }
 
+/// Topic properties.
+///
+/// These are properties attached to all topics and are represented as JSON. To add extra
+/// properties, use the `extra` field.
+///
+/// Docs taken and summarized from [here](https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc#properties).
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "lowercase")]
 pub struct Properties {
+    /// Persistent flag.
+    ///
+    /// If set to `true`, the server will save this value and it will be restored during server
+    /// startup. It will also not be deleted by the server if the last publisher stops publishing.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub persistent: Option<bool>,
+    /// Retained flag.
+    ///
+    /// If set to `true`, the server will not delete this topic when the last publisher stops
+    /// publishing.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retained: Option<bool>,
+    /// Cached flag.
+    ///
+    /// If set to `false`, servers and clients will not store the value of this topic meaning only
+    /// values updates will be avaible for the topic.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached: Option<bool>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Extra property values.
+    ///
+    /// This should be used for generic properties not officially recognized by a `NetworkTables` server.
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub extra: Option<HashMap<String, serde_json::Value>>
 }
 
+/// Options to use when subscribing to a topic.
+///
+/// To add extra properties, use the `extra` field.
 #[derive(Serialize, Default, Debug)]
 #[serde(rename_all = "lowercase")]
 pub struct SubscriptionOptions {
-    /// Default is `100 ms`
+    /// Periodic sweep time in seconds.
+    ///
+    /// This is how frequently the server should send changes. This value isn't guaranteed by the
+    /// server nor the client.
+    ///
+    /// Default is `100 ms`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub periodic: Option<Duration>,
-    /// Default is `false`
+    /// All changes flag.
+    ///
+    /// If `true`, all value changes are sent when subscribing rather than just the most recent
+    /// value.
+    ///
+    /// Default is `false`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub all: Option<bool>,
-    /// Default is `false`
+    /// No value changes flag.
+    ///
+    /// If `true`, the client will only receive topic announce messages and not value changes.
+    ///
+    /// Default is `false`.
     #[serde(rename = "topicsonly", skip_serializing_if = "Option::is_none")]
     pub topics_only: Option<bool>,
-    /// Default is `false`
+    /// Prefix flag.
+    ///
+    /// If `true`, all topics starting with the name of the topic(s) will be subscribed to.
+    ///
+    /// Default is `false`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<bool>,
 }

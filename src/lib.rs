@@ -77,9 +77,7 @@ impl Client {
 
     pub const UPDATE_TIME_INTERVAL: Duration = Duration::from_secs(5);
 
-    // TODO: fix client docs
-
-    /// idk makes a new client you can figure it out
+    /// Creates a new `Client` with options.
     ///
     /// # Panics
     /// Panics if the [`NTAddr::TeamNumber`] team number is greater than 25599.
@@ -96,10 +94,14 @@ impl Client {
         }
     }
 
+    /// Returns a new topic with a given name.
     pub fn topic(&self, name: impl ToString) -> Topic {
         Topic::new(name.to_string(), self.time.clone(), self.send_ws.0.clone(), self.recv_ws.0.clone())
     }
 
+    /// Connects to the `NetworkTables` server.
+    ///
+    /// This future will only complete when the client has disconnected from the server.
     pub async fn connect(mut self) -> Result<(), ConnectError> {
         // TODO: try connecting to wss first
         let uri = format!("ws://{}/nt/{}", self.addr, self.name);
@@ -221,9 +223,19 @@ impl Client {
     }
 }
 
+/// Options when creating a new [`Client`].
 pub struct NewClientOptions {
+    /// The address to connect to.
+    /// 
+    /// Default is [`NTAddr::Local`].
     pub addr: NTAddr,
+    /// The port of the server.
+    ///
+    /// Default is `5810` for unsecure connections and `5811` for secure ones.
     pub port: u16,
+    /// The name of the client.
+    ///
+    /// Default is `rust-client-{random u16}`
     pub name: String,
 }
 
@@ -264,6 +276,7 @@ impl Default for NTAddr {
 }
 
 impl NTAddr {
+    /// Converts this into an [`Ipv4Addr`].
     // NOTE: return Result instead of Option?
     pub fn into_addr(self) -> Option<Ipv4Addr> {
         let addr = match self {
@@ -280,12 +293,17 @@ impl NTAddr {
     }
 }
 
+/// Errors than can occur when connecting to a `NetworkTables` server.
 #[derive(thiserror::Error, Debug)]
 pub enum ConnectError {
+    /// An error occurred with the websocket.
     #[error("websocket error: {0}")]
     WebsocketError(#[from] tungstenite::Error),
 }
 
+/// Time information about a `NetworkTables` server and client.
+///
+/// Provides methods to retrieve both the client's internal time and the server's time.
 pub struct NetworkTablesTime {
     started: Instant,
     offset: Duration,
@@ -298,14 +316,18 @@ impl Default for NetworkTablesTime {
 }
 
 impl NetworkTablesTime {
+    /// Creates a new `NetworkTablesTime` with the client start time of [`Instant::now`] and a
+    /// server offset time of [`Duration::ZERO`].
     pub fn new() -> Self {
         Self { started: Instant::now(), offset: Duration::ZERO }
     }
 
+    /// Returns the current client time.
     pub fn client_time(&self) -> Duration {
         Instant::now().duration_since(self.started)
     }
 
+    /// Returns the current server time.
     pub fn server_time(&self) -> Duration {
         self.client_time() + self.offset
     }

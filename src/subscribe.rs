@@ -35,6 +35,7 @@ impl<T: NetworkTableDataType> Subscriber<T> {
         Ok(Self { _phantom: PhantomData, id, topic_id, prev_timestamp: None, ws_sender, ws_recv })
     }
 
+    /// Receives the next value for this subscriber.
     pub async fn recv(&mut self) -> Result<T, ConnectionClosedError> {
         while let Ok(data) = self.ws_recv.recv().await {
             match *data {
@@ -80,11 +81,21 @@ impl<T: NetworkTableDataType> Drop for Subscriber<T> {
     }
 }
 
+/// Errors that can occur when creating a new [`Subscriber`].
 #[derive(thiserror::Error, Debug)]
 pub enum NewSubscriberError {
     #[error(transparent)]
     ConnectionClosed(#[from] ConnectionClosedError),
-    #[error("mismatched data types! server has {0:?}, but tried to use {1:?} instead")]
-    MismatchedType(DataType, DataType),
+    /// The server and client have mismatched data types.
+    ///
+    /// This can occur if, for example, the client is subscribing to a topic and expecting
+    /// [`String`]s, but the server has a different data type stored, like an [`i32`].
+    #[error("mismatched data types! server has {server:?}, but tried to use {client:?} instead")]
+    MismatchedType {
+        /// The server's data type.
+        server: DataType,
+        /// The client's data type.
+        client: DataType,
+    },
 }
 

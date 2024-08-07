@@ -1,3 +1,5 @@
+//! `NetworkTables` data values and types.
+
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 
 // holy macro
@@ -115,32 +117,66 @@ macro_rules! transparent {
     };
 }
 
+/// A data type understood by a `NetworkTables` server.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DataType {
+    /// [`bool`] data type.
     Boolean,
+    /// [`f64`] data type.
     Double,
+    /// Any integer data type.
+    ///
+    /// This includes Rust types like [`u8`], [`i32`], and [`u16`].
     Int,
+    /// [`f32`] data type.
     Float,
+    /// [`String`] data type.
     String,
+    /// JSON data type.
+    ///
+    /// Internally, this is stored as a [`String`].
     Json,
+    /// Raw binary data type.
     Raw,
+    /// RPC data type.
+    ///
+    /// Internally, this is stored as a [`Vec<u8>`].
     Rpc,
+    /// MessagePack data type.
+    ///
+    /// This is generally used for nested data.
     Msgpack,
+    /// Google Protocol Buffers data type.
+    ///
+    /// Internally, this is stored as a [`Vec<u8>`].
     Protobuf,
+    /// [`Vec<bool>`] data type.
     #[serde(rename = "boolean[]")]
     BooleanArray,
+    /// [`Vec<f64>`] data type.
     #[serde(rename = "double[]")]
     DoubleArray,
+    /// A [`Vec`] of integers data type.
+    ///
+    /// This includes Rust types like [`Vec<u16>`], [`Vec<i8>`], and [`Vec<u64>`].
     #[serde(rename = "int[]")]
     IntArray,
+    /// [`Vec<f32>`] data type.
     #[serde(rename = "float[]")]
     FloatArray,
+    /// [`Vec<String>`] data type.
     #[serde(rename = "string[]")]
     StringArray,
 }
 
 impl DataType {
+    /// Creates a new `DataType` from an id.
+    ///
+    /// Returns [`Option::None`] if no `DataType` could be found with that id.
+    ///
+    /// It is guaranteed that the id mappings here match with the id mappings
+    /// in [`as_id`](Self::as_id).
     pub fn from_id(id: u32) -> Option<Self> {
         use DataType as D;
 
@@ -161,6 +197,10 @@ impl DataType {
         }
     }
 
+    /// Gets this `DataType` as an id.
+    ///
+    /// It is guaranteed that the id mappings here match with the id mappings in
+    /// [`from_id`](Self::from_id).
     pub fn as_id(&self) -> u32 {
         use DataType as D;
 
@@ -180,11 +220,15 @@ impl DataType {
     }
 }
 
+/// A piece of data that can be sent and received by a `NetworkTables` server.
 pub trait NetworkTableDataType: Clone {
+    /// Returns the `DataType` that this piece of data is.
     fn data_type() -> DataType;
 
+    /// Creates a new piece of data from a generic `MessagePack` value.
     fn from_value(value: &rmpv::Value) -> Option<Self>;
 
+    /// Converts this into a generic `MessagePack` value.
     fn into_value(self) -> rmpv::Value;
 }
 

@@ -1,3 +1,9 @@
+// TODO: example in doc
+
+//! Publisher portion of the `NetworkTables` spec.
+//!
+//! Publishers are used to set new values for topics that can be seen by subscribers.
+
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
 use tokio::{sync::RwLock, time::timeout};
@@ -35,11 +41,20 @@ impl<T: NetworkTableDataType> Publisher<T> {
         Ok(Self { _phantom: PhantomData, id, time, ws_sender })
     }
 
+    /// Publish a new value to the [`Topic`].
+    ///
+    /// [`Topic`]: crate::topic::Topic
     pub async fn set(&self, value: T) {
         let time = self.time.write().await;
         self.set_time(value, time.server_time()).await
     }
 
+    /// Publishes a default value to the [`Topic`].
+    ///
+    /// This default value will only be seen by other clients and the server if no other value has
+    /// been published to the [`Topic`] yet.
+    ///
+    /// [`Topic`]: crate::topic::Topic
     pub async fn set_default(&self, value: T) {
         self.set_time(value, Duration::ZERO).await
     }
@@ -76,13 +91,26 @@ impl<T: NetworkTableDataType> Drop for Publisher<T> {
     }
 }
 
+/// Errors that can occur when creating a new [`Publisher`].
 #[derive(thiserror::Error, Debug)]
 pub enum NewPublisherError {
+    /// The server didn't respond to the publish within the response timeout specified in [`NewClientOptions`].
+    ///
+    /// [`NewClientOptions`]: crate::NewClientOptions
     #[error("server didn't respond with announce")]
     NoResponse,
     #[error(transparent)]
     ConnectionClosed(#[from] ConnectionClosedError),
-    #[error("mismatched data types! server has {0:?}, but tried to use {1:?} instead")]
-    MismatchedType(DataType, DataType),
+    /// The server and client have mismatched data types.
+    ///
+    /// This can occur if, for example, the client is publishing [`String`]s to a topic that the
+    /// server has a different data type for, like an [`i32`].
+    #[error("mismatched data types! server has {server:?}, but tried to use {client:?} instead")]
+    MismatchedType {
+        /// The server's data type.
+        server: DataType,
+        /// The client's data type.
+        client: DataType,
+    },
 }
 

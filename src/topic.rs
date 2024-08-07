@@ -1,4 +1,8 @@
-use std::sync::Arc;
+//! Named data channels.
+//!
+//! Topics have a fixed data type and can be subscribed and published to.
+
+use std::{sync::Arc, time::Duration};
 
 use tokio::sync::RwLock;
 
@@ -6,6 +10,7 @@ use crate::{dataframe::{datatype::NetworkTableDataType, Properties, Subscription
 
 /// Represents a `NetworkTables` topic.
 ///
+/// A topic is a named data channel with a fixed data type that can be subscribed and published to.
 /// The intended method to obtain one of these is to use the [`Client::topic`] method.
 ///
 /// [`Client::topic`]: crate::Client::topic
@@ -23,7 +28,7 @@ impl Topic {
         Self { name, time, send_ws, recv_ws }
     }
 
-    /// Publishes to this topic.
+    /// Publishes to this topic with the data type `T`.
     ///
     /// # Note
     /// This method requires the [`Client`] websocket connection to already be made. Calling this
@@ -35,7 +40,7 @@ impl Topic {
         Publisher::new(self.name.clone(), properties, self.time.clone(), self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 
-    /// Subscribes to this topic.
+    /// Subscribes to this topic with the data type `T`.
     ///
     /// # Note
     /// This method requires the [`Client`] websocket connection to already be made. Calling this
