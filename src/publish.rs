@@ -45,7 +45,7 @@ impl<T: NetworkTableData> Publisher<T> {
     ///
     /// [`Topic`]: crate::topic::Topic
     pub async fn set(&self, value: T) {
-        let time = self.time.write().await;
+        let time = self.time.read().await;
         self.set_time(value, time.server_time()).await
     }
 
