@@ -207,6 +207,12 @@ pub struct SubscriptionOptions {
     /// Default is `false`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<bool>,
+
+    /// Extra data.
+    ///
+    /// This should be used for generic options not officially recognized by a `NetworkTables` server.
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<HashMap<String, serde_json::Value>>,
 }
 
 fn serialize_dur_as_u32<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
