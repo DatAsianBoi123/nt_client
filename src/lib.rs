@@ -1,6 +1,8 @@
 // TODO: use tracing instead of println!
 // TODO: use less `expect` and `unwrap`!!
 // TODO: documentation
+// TODO: add derives to pub structs (Debug, Clone, Eq, etc.)
+
 // #![warn(missing_docs)]
 
 //! A blazingly fast [NetworkTables 4.1][NetworkTables] client.
@@ -47,6 +49,7 @@ use tokio_tungstenite::tungstenite::{self, Message};
 use topic::Topic;
 
 pub mod error;
+// TODO: rename to `data`
 pub mod dataframe;
 pub mod topic;
 pub mod subscribe;
@@ -212,6 +215,7 @@ impl Client {
             }).await;
         });
 
+        // TODO: actual error handling here
         select! {
             _ = interval_ping => eprintln!("interval pinger stopped!"),
             _ = write_task => eprintln!("write task stopped!"),

@@ -3,6 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use datatype::{DataType, NetworkTableDataType};
 use serde::{de::Visitor, ser::Error, Deserialize, Deserializer, Serialize, Serializer};
 
+// TODO: rename to `type`
 pub mod datatype;
 
 // TODO: be able to send multiple messages at once
@@ -184,6 +185,7 @@ pub struct SubscriptionOptions {
     ///
     /// Default is `100 ms`.
     #[serde(skip_serializing_if = "Option::is_none")]
+    // TODO: special (de)serialization to convert to seconds
     pub periodic: Option<Duration>,
     /// All changes flag.
     ///
