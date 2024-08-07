@@ -68,7 +68,7 @@ pub type NTClientReceiver = broadcast::Receiver<Arc<ClientboundData>>;
 pub struct Client {
     addr: SocketAddrV4,
     name: String,
-    pub time: Arc<RwLock<NetworkTablesTime>>,
+    time: Arc<RwLock<NetworkTablesTime>>,
 
     send_ws: (NTServerSender, NTServerReceiver),
     recv_ws: (NTClientSender, NTClientReceiver),
@@ -97,9 +97,16 @@ impl Client {
         }
     }
 
+    /// Returns the current `NetworkTablesTime` for this client.
+    ///
+    /// This can safely be used asynchronously and across different threads.
+    pub fn time(&self) -> Arc<RwLock<NetworkTablesTime>> {
+        self.time.clone()
+    }
+
     /// Returns a new topic with a given name.
     pub fn topic(&self, name: impl ToString) -> Topic {
-        Topic::new(name.to_string(), self.time.clone(), self.send_ws.0.clone(), self.recv_ws.0.clone())
+        Topic::new(name.to_string(), self.time(), self.send_ws.0.clone(), self.recv_ws.0.clone())
     }
 
     /// Connects to the `NetworkTables` server.
