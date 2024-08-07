@@ -55,11 +55,11 @@ pub mod topic;
 pub mod subscribe;
 pub mod publish;
 
-pub type NTServerSender = broadcast::Sender<Arc<ServerboundMessage>>;
-pub type NTServerReceiver = broadcast::Receiver<Arc<ServerboundMessage>>;
+pub(crate) type NTServerSender = broadcast::Sender<Arc<ServerboundMessage>>;
+pub(crate) type NTServerReceiver = broadcast::Receiver<Arc<ServerboundMessage>>;
 
-pub type NTClientSender = broadcast::Sender<Arc<ClientboundData>>;
-pub type NTClientReceiver = broadcast::Receiver<Arc<ClientboundData>>;
+pub(crate) type NTClientSender = broadcast::Sender<Arc<ClientboundData>>;
+pub(crate) type NTClientReceiver = broadcast::Receiver<Arc<ClientboundData>>;
 
 /// The client used to interact with a `NetworkTables` server.
 ///
