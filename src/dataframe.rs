@@ -184,8 +184,7 @@ pub struct SubscriptionOptions {
     /// server nor the client.
     ///
     /// Default is `100 ms`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    // TODO: special (de)serialization to convert to seconds
+    #[serde(skip_serializing_if = "Option::is_none", serialize_with = "serialize_dur_as_secs")]
     pub periodic: Option<Duration>,
     /// All changes flag.
     ///
@@ -221,6 +220,16 @@ fn serialize_dur_as_micros<S>(duration: &Duration, serializer: S) -> Result<S::O
 where S: Serializer
 {
     serializer.serialize_u64(duration.as_micros().try_into().map_err(S::Error::custom)?)
+}
+
+fn serialize_dur_as_secs<S>(duration: &Option<Duration>, serializer: S) -> Result<S::Ok, S::Error>
+where S: Serializer
+{
+    if let Some(duration) = duration {
+        serializer.serialize_f64(duration.as_secs_f64())
+    } else {
+        serializer.serialize_none()
+    }
 }
 
 fn deserialize_micros_as_dur<'de, D>(deserializer: D) -> Result<Duration, D::Error>
