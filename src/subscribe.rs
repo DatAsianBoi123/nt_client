@@ -25,7 +25,7 @@ pub struct Subscriber<T: NetworkTableData> {
     ws_recv: NTClientReceiver,
 }
 
-// TODO: handle multiple topics being subscribed to
+// FIX: multiple topics being subscribed to causes bugs
 impl<T: NetworkTableData> Subscriber<T> {
     // NOTE: pub(super) or pub?
     pub(super) async fn new(
