@@ -220,13 +220,13 @@ pub struct SubscriptionOptions {
 fn serialize_dur_as_micros<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
 where S: Serializer
 {
-    serializer.serialize_u32(duration.as_micros().try_into().map_err(S::Error::custom)?)
+    serializer.serialize_u64(duration.as_micros().try_into().map_err(S::Error::custom)?)
 }
 
 fn deserialize_micros_as_dur<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where D: Deserializer<'de>
 {
-    deserializer.deserialize_u32(DurationMicrosVisitor)
+    deserializer.deserialize_u64(DurationMicrosVisitor)
 }
 
 struct DurationMicrosVisitor;
@@ -235,7 +235,7 @@ impl<'de> Visitor<'de> for DurationMicrosVisitor {
     type Value = Duration;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "a valid u32 micros duration")
+        write!(formatter, "a valid micros duration")
     }
 
     fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
