@@ -7,6 +7,7 @@
 use std::{marker::PhantomData, time::Duration};
 
 use tokio::sync::broadcast;
+use tracing::debug;
 
 use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, recv_until, NTClientReceiver, NTServerSender};
 
@@ -47,6 +48,7 @@ impl<T: NetworkTableData> Subscriber<T> {
         }).await?;
         if T::data_type() != r#type { return Err(NewSubscriberError::MismatchedType { server: r#type, client: T::data_type() }); };
 
+        debug!("[sub {id}] subscribed");
         Ok(Self { _phantom: PhantomData, id, topic_id, prev_timestamp: None, ws_sender, ws_recv })
     }
 
@@ -59,6 +61,7 @@ impl<T: NetworkTableData> Subscriber<T> {
                 if past { return None; };
 
                 self.prev_timestamp = Some(*timestamp);
+                debug!("[sub {}] updated: {data}", self.id);
                 Some(T::from_value(data).expect("types match up"))
             } else {
                 None
@@ -74,7 +77,7 @@ impl<T: NetworkTableData> Drop for Subscriber<T> {
         let unsub_message = ServerboundTextData::Unsubscribe(Unsubscribe { subuid: self.id });
         // if the receiver is dropped, the ws connection is closed
         let _ = self.ws_sender.send(ServerboundMessage::Text(unsub_message).into());
-        println!("[sub {}] unsubscribed", self.id);
+        debug!("[sub {}] unsubscribed", self.id);
     }
 }
 

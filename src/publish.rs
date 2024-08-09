@@ -7,6 +7,7 @@
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
 use tokio::{sync::{broadcast, RwLock}, time::timeout};
+use tracing::debug;
 
 use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, recv_until, NTClientReceiver, NTServerSender, NetworkTablesTime};
 
@@ -49,6 +50,7 @@ impl<T: NetworkTableData> Publisher<T> {
         }).await.map_err(|_| NewPublisherError::NoResponse)??;
         if T::data_type() != r#type { return Err(NewPublisherError::MismatchedType { server: r#type, client: T::data_type() }); };
 
+        debug!("[pub {id}] published topic");
         Ok(Self { _phantom: PhantomData, id, time, ws_sender })
     }
 
@@ -74,7 +76,7 @@ impl<T: NetworkTableData> Publisher<T> {
         let data_value = data.clone().into_value();
         let binary = BinaryData::new(self.id, timestamp, data);
         self.ws_sender.send(ServerboundMessage::Binary(binary).into()).expect("receiver still exists");
-        println!("[pub {}] set value to {data_value}", self.id)
+        debug!("[pub {}] set to {data_value} at time {timestamp:?}", self.id);
     }
 }
 
@@ -83,7 +85,7 @@ impl<T: NetworkTableData> Drop for Publisher<T> {
         let data = ServerboundTextData::Unpublish(Unpublish { pubuid: self.id });
         // if the receiver is dropped, the ws connection is closed
         let _ = self.ws_sender.send(ServerboundMessage::Text(data).into());
-        println!("[pub {}] unsubscribed", self.id);
+        debug!("[pub {}] unpublished", self.id);
     }
 }
 

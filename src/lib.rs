@@ -1,4 +1,3 @@
-// TODO: use tracing instead of println!
 // TODO: use less `expect` and `unwrap`!!
 // TODO: documentation
 // TODO: add derives to pub structs (Debug, Clone, Eq, etc.)
@@ -47,6 +46,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::{select, sync::{broadcast, mpsc, Notify, RwLock}, time::{interval, sleep, timeout}};
 use tokio_tungstenite::tungstenite::{self, Message};
 use topic::Topic;
+use tracing::{debug, error, info};
 
 pub mod error;
 // TODO: rename to `data`
@@ -118,8 +118,8 @@ impl Client {
     pub async fn connect(mut self) -> Result<(), ConnectError> {
         // TODO: try connecting to wss first
         let uri = format!("ws://{}/nt/{}", self.addr, self.name);
-        let (ws_stream, _) = tokio_tungstenite::connect_async(uri).await?;
-        println!("connected to websocket");
+        let (ws_stream, _) = tokio_tungstenite::connect_async(uri.clone()).await?;
+        info!("connected to server at {uri}");
 
         let (mut write, read) = ws_stream.split();
 
@@ -168,7 +168,7 @@ impl Client {
 
                     let mut time = self.time.write().await;
                     time.offset = offset;
-                    println!("updated time");
+                    debug!("updated time, offset = {offset:?}");
                 }
             }
         });
@@ -180,7 +180,7 @@ impl Client {
                     ServerboundMessage::Binary(binary) => Message::Binary(rmp_serde::to_vec(binary).expect("can serialize to binary")),
                     ServerboundMessage::Ping => Message::Ping(Vec::new()),
                 };
-                if !matches!(packet, Message::Ping(_)) { println!("sent message: {packet:?}"); };
+                if !matches!(packet, Message::Ping(_)) { debug!("sent message: {packet:?}"); };
                 write.send(packet).await.expect("can send message");
             }
         });
@@ -217,7 +217,7 @@ impl Client {
                 };
 
                 if let Some(data_frame) = message {
-                    println!("received message(s): {data_frame:?}");
+                    debug!("received message(s): {data_frame:?}");
                     for data in data_frame {
                         self.recv_ws.0.send(data.into()).expect("receivers exist");
                     }
@@ -227,12 +227,12 @@ impl Client {
 
         // TODO: actual error handling here
         select! {
-            _ = interval_ping => eprintln!("interval pinger stopped!"),
-            _ = write_task => eprintln!("write task stopped!"),
-            _ = read_task => eprintln!("read task stopped!"),
-            _ = update_time => eprintln!("update time stopped!"),
+            _ = interval_ping => error!("interval pinger stopped!"),
+            _ = write_task => error!("write task stopped!"),
+            _ = read_task => error!("read task stopped!"),
+            _ = update_time => error!("update time stopped!"),
         };
-        println!("closing connection");
+        info!("closing connection");
         Ok(())
     }
 }
