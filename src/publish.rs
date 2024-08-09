@@ -9,7 +9,7 @@ use std::{marker::PhantomData, sync::Arc, time::Duration};
 use tokio::{sync::{broadcast, RwLock}, time::timeout};
 use tracing::debug;
 
-use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, recv_until, NTClientReceiver, NTServerSender, NetworkTablesTime};
+use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, recv_until, NTClientReceiver, NTServerSender, NetworkTablesTime};
 
 /// A `NetworkTables` publisher that publishes values to a [`Topic`].
 ///

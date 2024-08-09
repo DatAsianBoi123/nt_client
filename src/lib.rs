@@ -41,7 +41,7 @@
 use core::panic;
 use std::{collections::VecDeque, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
 
-use dataframe::{BinaryData, ClientboundData, ClientboundDataFrame, ServerboundMessage};
+use data::{BinaryData, ClientboundData, ClientboundDataFrame, ServerboundMessage};
 use futures_util::{SinkExt, StreamExt};
 use tokio::{select, sync::{broadcast, mpsc, Notify, RwLock}, time::{interval, sleep, timeout}};
 use tokio_tungstenite::tungstenite::{self, Message};
@@ -49,8 +49,7 @@ use topic::Topic;
 use tracing::{debug, error, info};
 
 pub mod error;
-// TODO: rename to `data`
-pub mod dataframe;
+pub mod data;
 pub mod topic;
 pub mod subscribe;
 pub mod publish;

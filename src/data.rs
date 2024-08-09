@@ -1,10 +1,11 @@
+//! Data sent between a `NetworkTables` connection.
+
 use std::{collections::HashMap, time::Duration};
 
-use datatype::{DataType, NetworkTableData};
+use r#type::{DataType, NetworkTableData};
 use serde::{de::Visitor, ser::Error, Deserialize, Deserializer, Serialize, Serializer};
 
-// TODO: rename to `type`
-pub mod datatype;
+pub mod r#type;
 
 // TODO: be able to send multiple messages at once
 #[derive(Debug)]
@@ -126,7 +127,7 @@ pub struct BinaryData {
     pub id: i32,
     #[serde(serialize_with = "serialize_dur_as_micros", deserialize_with = "deserialize_micros_as_dur")]
     pub timestamp: Duration,
-    #[serde(serialize_with = "datatype::serialize_as_u32", deserialize_with = "datatype::deserialize_u32")]
+    #[serde(serialize_with = "r#type::serialize_as_u32", deserialize_with = "r#type::deserialize_u32")]
     pub data_type: DataType,
     pub data: rmpv::Value,
 }
@@ -143,7 +144,7 @@ impl BinaryData {
 /// properties, use the `extra` field.
 ///
 /// Docs taken and summarized from [here](https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc#properties).
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub struct Properties {
     /// Persistent flag.
@@ -175,7 +176,7 @@ pub struct Properties {
 /// Options to use when subscribing to a topic.
 ///
 /// To add extra properties, use the `extra` field.
-#[derive(Serialize, Default, Debug)]
+#[derive(Serialize, Default, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub struct SubscriptionOptions {
     /// Periodic sweep time in seconds.

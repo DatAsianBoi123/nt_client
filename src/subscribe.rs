@@ -9,7 +9,7 @@ use std::{marker::PhantomData, time::Duration};
 use tokio::sync::broadcast;
 use tracing::debug;
 
-use crate::{dataframe::{datatype::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, recv_until, NTClientReceiver, NTServerSender};
+use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, recv_until, NTClientReceiver, NTServerSender};
 
 /// A `NetworkTables` subscriber that subscribes to a [`Topic`].
 ///

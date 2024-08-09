@@ -6,7 +6,7 @@ use std::{sync::Arc, time::Duration};
 
 use tokio::sync::RwLock;
 
-use crate::{dataframe::{datatype::NetworkTableData, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::{NewSubscriberError, Subscriber}, NTClientSender, NTServerSender, NetworkTablesTime};
+use crate::{data::{r#type::NetworkTableData, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::{NewSubscriberError, Subscriber}, NTClientSender, NTServerSender, NetworkTablesTime};
 
 /// Represents a `NetworkTables` topic.
 ///
