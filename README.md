@@ -15,8 +15,8 @@ This is meant to be used within coprocessors that can send and receive data from
 - [x] Connecting to server
 - [x] Subscribing to a topic
 - [x] Publishing to a topic
-- [ ] 100% documentation coverage (12.41%)
-- [ ] Proper logging (instead of println!)
+- [ ] 100% documentation coverage (12.41% as of 0.1.0)
+- [x] Proper logging (instead of println!)
 - [ ] Examples
 - [ ] Better error handling (less `.expect`)
 - [ ] Reconnections
