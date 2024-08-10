@@ -32,7 +32,6 @@
 //! });
 //! 
 //! client.connect().await.unwrap();
-//!
 //! # });
 //! ```
 //! 
