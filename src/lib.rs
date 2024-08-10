@@ -1,6 +1,5 @@
 // TODO: use less `expect` and `unwrap`!!
 // TODO: documentation
-// TODO: add derives to pub structs (Debug, Clone, Eq, etc.)
 
 // #![warn(missing_docs)]
 
@@ -63,6 +62,7 @@ pub(crate) type NTClientReceiver = broadcast::Receiver<Arc<ClientboundData>>;
 ///
 /// When this goes out of scope, the websocket connection is closed and no attempts to reconnect
 /// will be made.
+#[derive(Debug)]
 pub struct Client {
     addr: SocketAddrV4,
     name: String,
@@ -236,6 +236,7 @@ impl Client {
 }
 
 /// Options when creating a new [`Client`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NewClientOptions {
     /// The address to connect to.
     /// 
@@ -282,6 +283,7 @@ impl Default for NewClientOptions {
 /// Represents an address that a `NetworkTables` client can connect to.
 ///
 /// By default, this is set to [`NTAddr::Local`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NTAddr {
     /// Address corresponding to an FRC team number.
     ///
@@ -338,6 +340,7 @@ pub enum ConnectError {
 /// Time information about a `NetworkTables` server and client.
 ///
 /// Provides methods to retrieve both the client's internal time and the server's time.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NetworkTablesTime {
     started: Instant,
     offset: Duration,

@@ -14,7 +14,7 @@ use crate::{data::{r#type::NetworkTableData, Properties, SubscriptionOptions}, p
 /// The intended method to obtain one of these is to use the [`Client::topic`] method.
 ///
 /// [`Client::topic`]: crate::Client::topic
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Topic {
     name: String,
     time: Arc<RwLock<NetworkTablesTime>>,
@@ -22,6 +22,14 @@ pub struct Topic {
     send_ws: NTServerSender,
     recv_ws: NTClientSender,
 }
+
+impl PartialEq for Topic {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for Topic { }
 
 impl Topic {
     // NOTE: pub(super) or just pub?

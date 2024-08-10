@@ -43,12 +43,21 @@ use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, C
 /// This will automatically get unpublished whenever this goes out of scope.
 ///
 /// [`Topic`]: crate::topic::Topic
+#[derive(Debug)]
 pub struct Publisher<T: NetworkTableData> {
     _phantom: PhantomData<T>,
     id: i32,
     time: Arc<RwLock<NetworkTablesTime>>,
     ws_sender: NTServerSender,
 }
+
+impl<T: NetworkTableData> PartialEq for Publisher<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<T: NetworkTableData> Eq for Publisher<T> { }
 
 impl<T: NetworkTableData> Publisher<T> {
     // NOTE: pub(super) or pub?
@@ -117,7 +126,7 @@ impl<T: NetworkTableData> Drop for Publisher<T> {
 }
 
 /// Errors that can occur when creating a new [`Publisher`].
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum NewPublisherError {
     /// An error occurred when receiving data from the connection.
     #[error(transparent)]

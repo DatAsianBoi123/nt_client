@@ -144,7 +144,7 @@ impl BinaryData {
 /// properties, use the `extra` field.
 ///
 /// Docs taken and summarized from [here](https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc#properties).
-#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub struct Properties {
     /// Persistent flag.
@@ -176,7 +176,7 @@ pub struct Properties {
 /// Options to use when subscribing to a topic.
 ///
 /// To add extra properties, use the `extra` field.
-#[derive(Serialize, Default, Debug, PartialEq, Eq)]
+#[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub struct SubscriptionOptions {
     /// Periodic sweep time in seconds.
