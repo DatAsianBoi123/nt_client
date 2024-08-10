@@ -1,8 +1,35 @@
-// TODO: example in doc
-
 //! Publisher portion of the `NetworkTables` spec.
 //!
 //! Publishers are used to set new values for topics that can be seen by subscribers.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use std::time::Duration;
+//! use nt_client::Client;
+//!
+//! # tokio_test::block_on(async {
+//! let client = Client::new(Default::default());
+//!
+//! // increments the `/counter` topic every 5 seconds
+//! let counter_topic = client.topic("/counter");
+//! tokio::spawn(async move {
+//!     const INCREMENT_INTERVAL: Duration = Duration::from_secs(5);
+//!     
+//!     let mut publisher = counter_topic.publish::<u32>(Default::default()).await.unwrap();
+//!     let mut interval = tokio::time::interval(INCREMENT_INTERVAL);
+//!     let mut counter = 0;
+//!     
+//!     loop {
+//!         interval.tick().await;
+//!
+//!         publisher.set(counter).await;
+//!         counter += 1;
+//!     }
+//! });
+//!
+//! client.connect().await.unwrap();
+//! # });
 
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 

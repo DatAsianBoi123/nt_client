@@ -1,8 +1,28 @@
-// TODO: example in doc
-
 //! Subscriber portion of the `NetworkTables` spec.
 //!
 //! Subscribers receive data value updates to a topic.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use nt_client::Client;
+//!
+//! # tokio_test::block_on(async {
+//! let client = Client::new(Default::default());
+//!
+//! // prints updates to the `/counter` topic to the stdout
+//! let counter_topic = client.topic("/counter");
+//! tokio::spawn(async move {
+//!     // subscribes to the `/counter` topic and expects the type to be `i32`
+//!     let mut subscriber = counter_topic.subscribe::<i32>(Default::default()).await.unwrap();
+//!     
+//!     while let Ok(recv) = subscriber.recv().await {
+//!         println!("{recv}");
+//!     }
+//! });
+//!
+//! client.connect().await.unwrap();
+//! # });
 
 use std::{marker::PhantomData, time::Duration};
 
