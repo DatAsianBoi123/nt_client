@@ -36,6 +36,7 @@ use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, C
 /// This will automatically get unsubscribed whenever this goes out of scope.
 ///
 /// [`Topic`]: crate::topic::Topic
+#[derive(Debug)]
 pub struct Subscriber<T: NetworkTableData> {
     _phantom: PhantomData<T>,
     id: i32,
@@ -45,6 +46,14 @@ pub struct Subscriber<T: NetworkTableData> {
     ws_sender: NTServerSender,
     ws_recv: NTClientReceiver,
 }
+
+impl<T: NetworkTableData> PartialEq for Subscriber<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<T: NetworkTableData> Eq for Subscriber<T> { }
 
 // FIX: multiple topics being subscribed to causes bugs
 impl<T: NetworkTableData> Subscriber<T> {
@@ -102,7 +111,7 @@ impl<T: NetworkTableData> Drop for Subscriber<T> {
 }
 
 /// Errors that can occur when creating a new [`Subscriber`].
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum NewSubscriberError {
     /// An error occurred when receiving data from the connection.
     #[error(transparent)]
