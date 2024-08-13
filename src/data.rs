@@ -58,12 +58,6 @@ pub(crate) struct Unsubscribe {
 }
 
 #[derive(Debug)]
-pub enum ClientboundMessage {
-    DataFrame(ClientboundDataFrame),
-    Pong,
-}
-
-#[derive(Debug)]
 pub(crate) enum ClientboundDataFrame {
     Text(Vec<ClientboundTextData>),
     Binary(Vec<BinaryData>),
