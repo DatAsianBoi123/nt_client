@@ -68,16 +68,16 @@ impl<T: NetworkTableData> Subscriber<T> {
         let sub_message = ServerboundTextData::Subscribe(Subscribe { topics, subuid: id, options });
         ws_sender.send(ServerboundMessage::Text(sub_message).into()).expect("receivers exist");
 
-        let (r#type, topic_id) = recv_until(&mut ws_recv, |data| {
-            if let ClientboundData::Text(ClientboundTextData::Announce(Announce { id, ref r#type, .. })) = *data {
+        let (name, r#type, topic_id) = recv_until(&mut ws_recv, |data| {
+            if let ClientboundData::Text(ClientboundTextData::Announce(Announce { ref name, id, ref r#type, .. })) = *data {
                 // TODO: handle other properties
 
-                Some((r#type.clone(), id))
+                Some((name.clone(), r#type.clone(), id))
             } else { None }
         }).await?;
         if T::data_type() != r#type { return Err(NewSubscriberError::MismatchedType { server: r#type, client: T::data_type() }); };
 
-        debug!("[sub {id}] subscribed");
+        debug!("[sub {id}] subscribed to `{name}`");
         Ok(Self { _phantom: PhantomData, id, topic_id, prev_timestamp: None, ws_sender, ws_recv })
     }
 

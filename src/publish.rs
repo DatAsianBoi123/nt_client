@@ -73,12 +73,12 @@ impl<T: NetworkTableData> Publisher<T> {
         let pub_message = ServerboundTextData::Publish(Publish { name, pubuid: id, r#type: T::data_type(), properties });
         ws_sender.send(ServerboundMessage::Text(pub_message).into()).map_err(|_| broadcast::error::RecvError::Closed)?;
 
-        let (r#type, id) = timeout(timeout_duration, async move {
+        let (name, r#type, id) = timeout(timeout_duration, async move {
             recv_until(&mut ws_recv, |data| {
-                if let ClientboundData::Text(ClientboundTextData::Announce(Announce { ref r#type, pubuid: Some(pubuid), .. })) = *data {
+                if let ClientboundData::Text(ClientboundTextData::Announce(Announce { ref name, ref r#type, pubuid: Some(pubuid), .. })) = *data {
                     // TODO: cached property
 
-                    Some((r#type.clone(), pubuid))
+                    Some((name.clone(), r#type.clone(), pubuid))
                 } else {
                     None
                 }
@@ -86,7 +86,7 @@ impl<T: NetworkTableData> Publisher<T> {
         }).await.map_err(|_| NewPublisherError::NoResponse)??;
         if T::data_type() != r#type { return Err(NewPublisherError::MismatchedType { server: r#type, client: T::data_type() }); };
 
-        debug!("[pub {id}] published topic");
+        debug!("[pub {id}] publishing to topic `{name}`");
         Ok(Self { _phantom: PhantomData, id, time, ws_sender })
     }
 
