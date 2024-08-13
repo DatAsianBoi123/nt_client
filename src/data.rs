@@ -9,7 +9,7 @@ pub mod r#type;
 
 // TODO: be able to send multiple messages at once
 #[derive(Debug)]
-pub enum ServerboundMessage {
+pub(crate) enum ServerboundMessage {
     Text(ServerboundTextData),
     Binary(BinaryData),
     Ping,
@@ -17,7 +17,7 @@ pub enum ServerboundMessage {
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase", tag = "method", content = "params")]
-pub enum ServerboundTextData {
+pub(crate) enum ServerboundTextData {
     Publish(Publish),
     Unpublish(Unpublish),
     SetProperties(SetProperties),
@@ -27,7 +27,7 @@ pub enum ServerboundTextData {
 }
 
 #[derive(Serialize, Debug)]
-pub struct Publish {
+pub(crate) struct Publish {
     pub name: String,
     pub pubuid: i32,
     pub r#type: DataType,
@@ -35,25 +35,25 @@ pub struct Publish {
 }
 
 #[derive(Serialize, Debug)]
-pub struct Unpublish {
+pub(crate) struct Unpublish {
     pub pubuid: i32,
 }
 
 #[derive(Serialize, Debug)]
-pub struct SetProperties {
+pub(crate) struct SetProperties {
     pub name: String,
     pub update: Properties,
 }
 
 #[derive(Serialize, Debug)]
-pub struct Subscribe {
+pub(crate) struct Subscribe {
     pub topics: Vec<String>,
     pub subuid: i32,
     pub options: SubscriptionOptions,
 }
 
 #[derive(Serialize, Debug)]
-pub struct Unsubscribe {
+pub(crate) struct Unsubscribe {
     pub subuid: i32,
 }
 
@@ -64,7 +64,7 @@ pub enum ClientboundMessage {
 }
 
 #[derive(Debug)]
-pub enum ClientboundDataFrame {
+pub(crate) enum ClientboundDataFrame {
     Text(Vec<ClientboundTextData>),
     Binary(Vec<BinaryData>),
 }
@@ -79,7 +79,7 @@ impl IntoIterator for ClientboundDataFrame {
 }
 
 #[derive(Debug)]
-pub enum ClientboundData {
+pub(crate) enum ClientboundData {
     Text(ClientboundTextData),
     Binary(BinaryData),
 }
@@ -95,14 +95,14 @@ impl From<ClientboundDataFrame> for Vec<ClientboundData> {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "lowercase", tag = "method", content = "params")]
-pub enum ClientboundTextData {
+pub(crate) enum ClientboundTextData {
     Announce(Announce),
     Unannounce(Unannounce),
     Properties(PropertiesData),
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Announce {
+pub(crate) struct Announce {
     pub name: String,
     pub id: i32,
     pub r#type: DataType,
@@ -111,19 +111,19 @@ pub struct Announce {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Unannounce {
+pub(crate) struct Unannounce {
     pub name: String,
     pub id: i32,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct PropertiesData {
+pub(crate) struct PropertiesData {
     pub name: String,
     pub ack: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BinaryData {
+pub(crate) struct BinaryData {
     pub id: i32,
     #[serde(serialize_with = "serialize_dur_as_micros", deserialize_with = "deserialize_micros_as_dur")]
     pub timestamp: Duration,
