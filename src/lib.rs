@@ -21,9 +21,7 @@
 //!
 //! let thing_topic = client.topic("/thing");
 //! tokio::spawn(async move {
-//!     let mut sub = thing_topic.subscribe(Default::default())
-//!         .await
-//!         .expect("websocket connection closed!");
+//!     let mut sub = thing_topic.subscribe(Default::default()).await;
 //!
 //!     while let Ok(ReceivedMessage::Updated((_topic, value))) = sub.recv().await {
 //!         println!("topic updated: '{value}'")

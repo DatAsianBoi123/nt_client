@@ -14,8 +14,8 @@
 //! let counter_topic = client.topic("/counter");
 //! tokio::spawn(async move {
 //!     // subscribes to the `/counter`
-//!     let mut subscriber = counter_topic.subscribe(Default::default()).await.unwrap();
-//!     
+//!     let mut subscriber = counter_topic.subscribe(Default::default()).await;
+//!
 //!     loop {
 //!         match subscriber.recv().await {
 //!             Ok(ReceivedMessage::Updated((_topic, value))) => {
