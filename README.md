@@ -15,7 +15,7 @@ This is meant to be used within coprocessors that can send and receive data from
 - [x] Connecting to server
 - [x] Subscribing to a topic
 - [x] Publishing to a topic
-- [ ] 100% documentation coverage (12.41% as of 0.1.0)
+- [x] 100% documentation coverage
 - [x] Proper logging (instead of println!)
 - [ ] Examples
 - [ ] Better error handling (less `.expect`)
@@ -35,7 +35,7 @@ cargo add nt_client
 A basic subscriber that prints changes to `stdout`
 
 ```rust
-use nt_client::{Client, NewClientOptions, NTAddr};
+use nt_client::{subscribe::ReceivedMessage, Client, NewClientOptions, NTAddr};
 
 #[tokio::main]
 async fn main() {
@@ -44,12 +44,10 @@ async fn main() {
 
     let thing_topic = client.topic("/thing");
     tokio::spawn(async move {
-        let mut sub = thing_topic.subscribe::<String>(Default::default())
-            .await
-            .expect("websocket connection closed!");
+        let mut sub = thing_topic.subscribe(Default::default()).await;
 
-        while let Ok(recv) = sub.recv().await {
-            println!("topic updated: '{recv}'")
+        while let Ok(ReceivedMessage::Updated((_topic, value))) = sub.recv().await {
+            println!("topic updated: '{value}'")
         }
     });
 
