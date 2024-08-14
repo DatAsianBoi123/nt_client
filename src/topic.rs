@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::RwLock;
 
 use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::Subscriber, NTClientSender, NTServerSender, NetworkTablesTime};
 
@@ -64,7 +64,7 @@ impl Topic {
     /// This method does not require the [`Client`] websocket connection to be made.
     ///
     /// [`Client`]: crate::Client
-    pub async fn subscribe(&self, options: SubscriptionOptions) -> Result<Subscriber, broadcast::error::RecvError> {
+    pub async fn subscribe(&self, options: SubscriptionOptions) -> Subscriber {
         Subscriber::new(vec![self.name.clone()], options, self.announced_topics.clone(), self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 

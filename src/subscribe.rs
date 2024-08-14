@@ -82,7 +82,7 @@ impl Subscriber {
         announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
         ws_sender: NTServerSender,
         ws_recv: NTClientReceiver,
-    ) -> Result<Self, broadcast::error::RecvError> {
+    ) -> Self {
         let id = rand::random();
 
         debug!("[sub {id}] subscribed to `{topics:?}`");
@@ -98,7 +98,7 @@ impl Subscriber {
         let sub_message = ServerboundTextData::Subscribe(Subscribe { topics: topics.clone(), subuid: id, options: options.clone() });
         ws_sender.send(ServerboundMessage::Text(sub_message).into()).expect("receivers exist");
 
-        Ok(Self {
+        Self {
             topics,
             id,
             options,
@@ -107,7 +107,7 @@ impl Subscriber {
             announced_topics,
             ws_sender,
             ws_recv
-        })
+        }
     }
 
     /// Receives the next value for this subscriber.
