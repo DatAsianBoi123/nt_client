@@ -38,9 +38,9 @@ use core::panic;
 use std::{collections::{HashMap, VecDeque}, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
 
 use data::{BinaryData, ClientboundData, ClientboundDataFrame, ClientboundTextData, ServerboundMessage, Unannounce};
-use futures_util::{Future, SinkExt, StreamExt};
-use tokio::{select, sync::{broadcast, mpsc, Notify, RwLock}, time::{interval, sleep, timeout}};
-use tokio_tungstenite::tungstenite::{self, Message};
+use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt};
+use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
+use tokio_tungstenite::{tungstenite::{self, Message}, MaybeTlsStream, WebSocketStream};
 use topic::{AnnouncedTopic, Topic};
 use tracing::{debug, error, info};
 
@@ -120,66 +120,94 @@ impl Client {
     /// Connects to the `NetworkTables` server.
     ///
     /// This future will only complete when the client has disconnected from the server.
-    pub async fn connect(mut self) -> Result<(), ConnectError> {
+    pub async fn connect(self) -> Result<(), ConnectError> {
         // TODO: try connecting to wss first
         let uri = format!("ws://{}/nt/{}", self.addr, self.name);
         let (ws_stream, _) = tokio_tungstenite::connect_async(uri.clone()).await?;
         info!("connected to server at {uri}");
 
-        let (mut write, read) = ws_stream.split();
+        let (write, read) = ws_stream.split();
 
-        let ping_task_ws_sender = self.send_ws.0.clone();
         let pong_notify_recv = Arc::new(Notify::new());
         let pong_notify_send = pong_notify_recv.clone();
-        // TODO: split tasks into their own methods
-        let interval_ping = tokio::spawn(async move {
-            sleep(self.ping_interval).await;
+        let ping_task = Client::start_ping_task(pong_notify_recv, self.send_ws.0.clone(), self.ping_interval, self.response_timeout);
 
-            let mut interval = interval(self.ping_interval);
+        let (update_time_sender, update_time_recv) = mpsc::channel(1);
+        let update_time_task = Client::start_update_time_task(self.update_time_interval, self.time(), self.send_ws.0.clone(), update_time_recv);
+
+        let announced_topics = self.announced_topics();
+        let write_task = Client::start_write_task(self.send_ws.1, write);
+        let read_task = Client::start_read_task(read, update_time_sender, pong_notify_send, announced_topics, self.recv_ws.0);
+
+        // TODO: actual error handling here
+        select! {
+            _ = ping_task => error!("interval pinger stopped!"),
+            _ = write_task => error!("write task stopped!"),
+            _ = read_task => error!("read task stopped!"),
+            _ = update_time_task => error!("update time stopped!"),
+        };
+        info!("closing connection");
+        Ok(())
+    }
+
+    fn start_ping_task(pong_recv: Arc<Notify>, ws_sender: NTServerSender, ping_interval: Duration, response_timeout: Duration) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut interval = interval(ping_interval);
+            interval.tick().await;
             loop {
                 interval.tick().await;
-                ping_task_ws_sender.send(ServerboundMessage::Ping.into()).expect("receiver still exists");
+                ws_sender.send(ServerboundMessage::Ping.into()).expect("receiver still exists");
 
-                if (timeout(self.response_timeout, pong_notify_recv.notified()).await).is_err() {
+                if (timeout(response_timeout, pong_recv.notified()).await).is_err() {
                     // TODO: reconnect instead of panicking
                     panic!("pong not received within 1 second! terminating connection");
                 }
             }
-        });
+        })
+    }
 
-        let (update_time_sender, mut update_time_recv) = mpsc::channel(1);
-        let update_time_ws = self.send_ws.0.clone();
-        let update_time = tokio::spawn(async move {
-            let mut interval = interval(self.update_time_interval);
+    fn start_update_time_task(
+        update_time_interval: Duration,
+        time: Arc<RwLock<NetworkTablesTime>>,
+        ws_sender: NTServerSender,
+        mut time_recv: mpsc::Receiver<(Duration, Duration)>,
+    ) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut interval = interval(update_time_interval);
             loop {
                 interval.tick().await;
 
                 let client_time = {
-                    let time = self.time.read().await;
+                    let time = time.read().await;
                     time.client_time()
                 };
                 // TODO: handle client time overflow
                 let data = BinaryData::new::<u64>(-1, Duration::ZERO, client_time.as_micros().try_into().expect("client time overflowed"));
-                update_time_ws.send(ServerboundMessage::Binary(data).into()).expect("receiver still exists");
+                ws_sender.send(ServerboundMessage::Binary(data).into()).expect("receiver still exists");
 
-                if let Some((timestamp, client_send_time)) = update_time_recv.recv().await {
+                if let Some((timestamp, client_send_time)) = time_recv.recv().await {
                     let offset = {
-                        let now = self.time.read().await.client_time();
+                        let now = time.read().await.client_time();
                         let rtt = now - client_send_time;
                         let server_time = timestamp - rtt / 2;
 
                         server_time - now
                     };
 
-                    let mut time = self.time.write().await;
+                    let mut time = time.write().await;
                     time.offset = offset;
                     debug!("updated time, offset = {offset:?}");
                 }
             }
-        });
+        })
+    }
 
-        let write_task = tokio::spawn(async move {
-            while let Ok(message) = self.send_ws.1.recv().await {
+    fn start_write_task(
+        mut server_recv: NTServerReceiver,
+        mut write: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
+    ) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            while let Ok(message) = server_recv.recv().await {
                 let packet = match &*message {
                     ServerboundMessage::Text(json) => Message::Text(serde_json::to_string(&[json]).expect("can serialize to json")),
                     ServerboundMessage::Binary(binary) => Message::Binary(rmp_serde::to_vec(binary).expect("can serialize to binary")),
@@ -188,10 +216,17 @@ impl Client {
                 if !matches!(packet, Message::Ping(_)) { debug!("sent message: {packet:?}"); };
                 write.send(packet).await.expect("can send message");
             }
-        });
+        })
+    }
 
-        let read_announced_topics = self.announced_topics.clone();
-        let read_task = tokio::spawn(async move {
+    fn start_read_task(
+        read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+        update_time_sender: mpsc::Sender<(Duration, Duration)>,
+        pong_send: Arc<Notify>,
+        announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
+        client_sender: NTClientSender,
+    ) -> JoinHandle<()> {
+        tokio::spawn(async move {
             read.for_each(|message| async {
                 let message = message.expect("can read message");
 
@@ -214,7 +249,7 @@ impl Client {
                         Some(ClientboundDataFrame::Text(json))
                     },
                     Message::Pong(_) => {
-                        pong_notify_send.notify_one();
+                        pong_send.notify_one();
                         None
                     },
                     // TODO: reconnect instead of panicking
@@ -227,32 +262,22 @@ impl Client {
                     for data in data_frame {
                         match &data {
                             ClientboundData::Text(ClientboundTextData::Announce(announce)) => {
-                                let mut announced_topics = read_announced_topics.write().await;
+                                let mut announced_topics = announced_topics.write().await;
                                 announced_topics.insert(announce.id, announce.into());
                             },
                             ClientboundData::Text(ClientboundTextData::Unannounce(Unannounce { id, .. })) => {
-                                let mut announced_topics = read_announced_topics.write().await;
+                                let mut announced_topics = announced_topics.write().await;
                                 announced_topics.remove(id);
                             },
                             // TODO: handle Properties
                             _ => (),
                         }
 
-                        self.recv_ws.0.send(data.into()).expect("receivers exist");
+                        client_sender.send(data.into()).expect("receivers exist");
                     }
                 };
             }).await;
-        });
-
-        // TODO: actual error handling here
-        select! {
-            _ = interval_ping => error!("interval pinger stopped!"),
-            _ = write_task => error!("write task stopped!"),
-            _ = read_task => error!("read task stopped!"),
-            _ = update_time => error!("update time stopped!"),
-        };
-        info!("closing connection");
-        Ok(())
+        })
     }
 }
 
@@ -413,5 +438,4 @@ where
         }
     };
 }
-
 
