@@ -2,15 +2,17 @@
 //!
 //! Topics have a fixed data type and can be subscribed and published to.
 
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use tokio::sync::RwLock;
 
-use crate::{data::{r#type::NetworkTableData, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::{NewSubscriberError, Subscriber}, NTClientSender, NTServerSender, NetworkTablesTime};
+use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::Subscriber, NTClientSender, NTServerSender, NetworkTablesTime};
 
 /// Represents a `NetworkTables` topic.
 ///
-/// A topic is a named data channel with a fixed data type that can be subscribed and published to.
+/// This differs from an [`AnnouncedTopic`], as that is a **server created topic**, while this is a
+/// **client created topic**.
+///
 /// The intended method to obtain one of these is to use the [`Client::topic`] method.
 ///
 /// [`Client::topic`]: crate::Client::topic
@@ -68,5 +70,60 @@ impl Topic {
     }
 
     // TODO: subscribe to multiple topics
+}
+
+/// A topic that has been announced by the `NetworkTables` server.
+///
+/// Topics will only be announced when there is a subscriber subscribing to it.
+///
+/// This differs from a [`Topic`], as that is a **client created topic**, while this is a
+/// **server created topic**.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnnouncedTopic {
+    name: String,
+    id: i32,
+    r#type: DataType,
+    properties: Properties,
+}
+
+impl AnnouncedTopic {
+    /// Gets the name of this topic.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Gets the id of this topic.
+    ///
+    /// This id is guaranteed to be unique.
+    pub fn id(&self) -> i32 {
+        self.id
+    }
+
+    /// Gets the data type of this topic.
+    pub fn r#type(&self) -> &DataType {
+        &self.r#type
+    }
+
+    /// Gets the properties of this topic.
+    pub fn properties(&self) -> &Properties {
+        &self.properties
+    }
+
+    /// Returns whether the given topic names and subscription options match this topic.
+    pub fn matches(&self, names: &[String], options: &SubscriptionOptions) -> bool {
+        names.iter()
+            .any(|name| &self.name == name || (options.prefix.is_some_and(|flag| flag) && self.name.starts_with(name)))
+    }
+}
+
+impl From<&Announce> for AnnouncedTopic {
+    fn from(value: &Announce) -> Self {
+        Self {
+            name: value.name.clone(),
+            id: value.id,
+            r#type: value.r#type.clone(),
+            properties: value.properties.clone(),
+        }
+    }
 }
 

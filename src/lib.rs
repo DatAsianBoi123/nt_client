@@ -37,13 +37,13 @@
 //! [NetworkTables]: https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc
 
 use core::panic;
-use std::{collections::VecDeque, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
+use std::{collections::{HashMap, VecDeque}, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
 
-use data::{BinaryData, ClientboundData, ClientboundDataFrame, ServerboundMessage};
-use futures_util::{SinkExt, StreamExt};
+use data::{BinaryData, ClientboundData, ClientboundDataFrame, ClientboundTextData, ServerboundMessage, Unannounce};
+use futures_util::{Future, SinkExt, StreamExt};
 use tokio::{select, sync::{broadcast, mpsc, Notify, RwLock}, time::{interval, sleep, timeout}};
 use tokio_tungstenite::tungstenite::{self, Message};
-use topic::Topic;
+use topic::{AnnouncedTopic, Topic};
 use tracing::{debug, error, info};
 
 pub mod error;
@@ -67,6 +67,7 @@ pub struct Client {
     addr: SocketAddrV4,
     name: String,
     time: Arc<RwLock<NetworkTablesTime>>,
+    announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
 
     response_timeout: Duration,
     ping_interval: Duration,
@@ -88,6 +89,7 @@ impl Client {
             addr: SocketAddrV4::new(addr, options.port),
             name: options.name,
             time: Default::default(),
+            announced_topics: Default::default(),
 
             response_timeout: options.response_timeout,
             ping_interval: options.ping_interval,
@@ -103,6 +105,13 @@ impl Client {
     /// This can safely be used asynchronously and across different threads.
     pub fn time(&self) -> Arc<RwLock<NetworkTablesTime>> {
         self.time.clone()
+    }
+
+    /// Returns a map of server announced topics for this client.
+    ///
+    /// This can be safely used asynchronously and across different threads.
+    pub fn announced_topics(&self) -> Arc<RwLock<HashMap<i32, AnnouncedTopic>>> {
+        self.announced_topics.clone()
     }
 
     /// Returns a new topic with a given name.
@@ -183,6 +192,7 @@ impl Client {
             }
         });
 
+        let read_announced_topics = self.announced_topics.clone();
         let read_task = tokio::spawn(async move {
             read.for_each(|message| async {
                 let message = message.expect("can read message");
@@ -217,6 +227,19 @@ impl Client {
                 if let Some(data_frame) = message {
                     debug!("received message(s): {data_frame:?}");
                     for data in data_frame {
+                        match &data {
+                            ClientboundData::Text(ClientboundTextData::Announce(announce)) => {
+                                let mut announced_topics = read_announced_topics.write().await;
+                                announced_topics.insert(announce.id, announce.into());
+                            },
+                            ClientboundData::Text(ClientboundTextData::Unannounce(Unannounce { id, .. })) => {
+                                let mut announced_topics = read_announced_topics.write().await;
+                                announced_topics.remove(id);
+                            },
+                            // TODO: handle Properties
+                            _ => (),
+                        }
+
                         self.recv_ws.0.send(data.into()).expect("receivers exist");
                     }
                 };
