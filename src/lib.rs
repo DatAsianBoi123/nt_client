@@ -1,7 +1,7 @@
 // TODO: use less `expect` and `unwrap`!!
-// TODO: documentation
+// TODO: inconsistencies with Gets and Returns in docs
 
-// #![warn(missing_docs)]
+#![warn(missing_docs)]
 
 //! A blazingly fast [NetworkTables 4.1][NetworkTables] client.
 //!
@@ -13,7 +13,7 @@
 //! # Examples
 //!
 //! ```no_run
-//! use nt_client::{Client, NewClientOptions, NTAddr};
+//! use nt_client::{subscribe::ReceivedMessage, Client, NewClientOptions, NTAddr};
 //!
 //! # tokio_test::block_on(async {
 //! let options = NewClientOptions { addr: NTAddr::Local, ..Default::default() };
@@ -21,12 +21,12 @@
 //!
 //! let thing_topic = client.topic("/thing");
 //! tokio::spawn(async move {
-//!     let mut sub = thing_topic.subscribe::<String>(Default::default())
+//!     let mut sub = thing_topic.subscribe(Default::default())
 //!         .await
 //!         .expect("websocket connection closed!");
 //!
-//!     while let Ok(recv) = sub.recv().await {
-//!         println!("topic updated: '{recv}'")
+//!     while let Ok(ReceivedMessage::Updated((_topic, value))) = sub.recv().await {
+//!         println!("topic updated: '{value}'")
 //!     }
 //! });
 //! 
