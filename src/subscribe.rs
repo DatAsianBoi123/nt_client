@@ -5,7 +5,7 @@
 //! # Examples
 //!
 //! ```no_run
-//! use nt_client::Client;
+//! use nt_client::{subscribe::ReceivedMessage, data::r#type::NetworkTableData, Client};
 //!
 //! # tokio_test::block_on(async {
 //! let client = Client::new(Default::default());
@@ -13,23 +13,40 @@
 //! // prints updates to the `/counter` topic to the stdout
 //! let counter_topic = client.topic("/counter");
 //! tokio::spawn(async move {
-//!     // subscribes to the `/counter` topic and expects the type to be `i32`
-//!     let mut subscriber = counter_topic.subscribe::<i32>(Default::default()).await.unwrap();
+//!     // subscribes to the `/counter`
+//!     let mut subscriber = counter_topic.subscribe(Default::default()).await.unwrap();
 //!     
-//!     while let Ok(recv) = subscriber.recv().await {
-//!         println!("{recv}");
+//!     loop {
+//!         match subscriber.recv().await {
+//!             Ok(ReceivedMessage::Updated((_topic, value))) => {
+//!                 // get the updated value as an `i32`
+//!                 let number: i32 = i32::from_value(&value).unwrap();
+//!                 println!("counter updated to {number}");
+//!             },
+//!             Ok(ReceivedMessage::Announced(topic)) => println!("announced topic: {topic:?}"),
+//!             Ok(ReceivedMessage::Unannounced { name, .. }) => println!("unannounced topic: {name}"),
+//!             Err(err) => {
+//!                 eprintln!("got error: {err:?}");
+//!                 break;
+//!             },
+//!         }
+//!     }
+//!     while let Ok(ReceivedMessage::Updated((_topic, value))) = subscriber.recv().await {
+//!         // get the updated value as an `i32`
+//!         let number: i32 = i32::from_value(&value).unwrap();
+//!         println!("{number}");
 //!     }
 //! });
 //!
 //! client.connect().await.unwrap();
 //! # });
 
-use std::{marker::PhantomData, time::Duration};
+use std::{collections::{HashMap, HashSet}, sync::Arc, time::Duration};
 
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, RwLock};
 use tracing::debug;
 
-use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, recv_until, NTClientReceiver, NTServerSender};
+use crate::{data::{BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, ServerboundTextData, Subscribe, SubscriptionOptions, Unsubscribe}, recv_until_async, topic::AnnouncedTopic, NTClientReceiver, NTServerSender};
 
 /// A `NetworkTables` subscriber that subscribes to a [`Topic`].
 ///
@@ -37,63 +54,106 @@ use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, C
 ///
 /// [`Topic`]: crate::topic::Topic
 #[derive(Debug)]
-pub struct Subscriber<T: NetworkTableData> {
-    _phantom: PhantomData<T>,
+pub struct Subscriber {
+    topics: Vec<String>,
     id: i32,
-    topic_id: i32,
-    prev_timestamp: Option<Duration>,
+    options: SubscriptionOptions,
+    topic_ids: Arc<RwLock<HashSet<i32>>>,
+    prev_timestamp: Arc<RwLock<Option<Duration>>>,
+    announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
 
     ws_sender: NTServerSender,
     ws_recv: NTClientReceiver,
 }
 
-impl<T: NetworkTableData> PartialEq for Subscriber<T> {
+impl PartialEq for Subscriber {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<T: NetworkTableData> Eq for Subscriber<T> { }
+impl Eq for Subscriber { }
 
-// FIX: multiple topics being subscribed to causes bugs
-impl<T: NetworkTableData> Subscriber<T> {
+impl Subscriber {
     // NOTE: pub(super) or pub?
     pub(super) async fn new(
         topics: Vec<String>,
         options: SubscriptionOptions,
+        announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
         ws_sender: NTServerSender,
-        mut ws_recv: NTClientReceiver,
-    ) -> Result<Self, NewSubscriberError> {
+        ws_recv: NTClientReceiver,
+    ) -> Result<Self, broadcast::error::RecvError> {
         let id = rand::random();
-        let sub_message = ServerboundTextData::Subscribe(Subscribe { topics, subuid: id, options });
+
+        debug!("[sub {id}] subscribed to `{topics:?}`");
+
+        let topic_ids = {
+            let announced_topics = announced_topics.read().await;
+            announced_topics.values()
+                .filter(|topic| topic.matches(&topics, &options))
+                .map(|topic| topic.id())
+                .collect()
+        };
+
+        let sub_message = ServerboundTextData::Subscribe(Subscribe { topics: topics.clone(), subuid: id, options: options.clone() });
         ws_sender.send(ServerboundMessage::Text(sub_message).into()).expect("receivers exist");
 
-        let (name, r#type, topic_id) = recv_until(&mut ws_recv, |data| {
-            if let ClientboundData::Text(ClientboundTextData::Announce(Announce { ref name, id, ref r#type, .. })) = *data {
-                // TODO: handle other properties
-
-                Some((name.clone(), r#type.clone(), id))
-            } else { None }
-        }).await?;
-        if T::data_type() != r#type { return Err(NewSubscriberError::MismatchedType { server: r#type, client: T::data_type() }); };
-
-        debug!("[sub {id}] subscribed to `{name}`");
-        Ok(Self { _phantom: PhantomData, id, topic_id, prev_timestamp: None, ws_sender, ws_recv })
+        Ok(Self {
+            topics,
+            id,
+            options,
+            topic_ids: Arc::new(RwLock::new(topic_ids)),
+            prev_timestamp: Default::default(),
+            announced_topics,
+            ws_sender,
+            ws_recv
+        })
     }
 
     /// Receives the next value for this subscriber.
-    pub async fn recv(&mut self) -> Result<T, broadcast::error::RecvError> {
-        recv_until(&mut self.ws_recv, |data| {
-            if let ClientboundData::Binary(BinaryData { id, ref timestamp, ref data, .. }) = *data {
-                if id != self.topic_id { return None; };
-                let past = if let Some(last_timestamp) = self.prev_timestamp { last_timestamp > *timestamp } else { false };
-                if past { return None; };
+    pub async fn recv(&mut self) -> Result<ReceivedMessage, broadcast::error::RecvError> {
+        recv_until_async(&mut self.ws_recv, |data| {
+            let topic_ids = self.topic_ids.clone();
+            let prev_timestamp = self.prev_timestamp.clone();
+            let announced_topics = self.announced_topics.clone();
+            let sub_id = self.id;
+            let topics = &self.topics;
+            let options = &self.options;
+            async move {
+                match *data {
+                    ClientboundData::Binary(BinaryData { id, ref timestamp, ref data, .. }) => {
+                        let contains = {
+                            topic_ids.read().await.contains(&id)
+                        };
+                        if !contains { return None; };
+                        if prev_timestamp.read().await.is_some_and(|last_timestamp| last_timestamp > *timestamp) { return None; };
 
-                self.prev_timestamp = Some(*timestamp);
-                debug!("[sub {}] updated: {data}", self.id);
-                Some(T::from_value(data).expect("types match up"))
-            } else {
-                None
+                        {
+                            let mut prev_timestamp = prev_timestamp.write().await;
+                            *prev_timestamp = Some(*timestamp);
+                        }
+                        debug!("[sub {}] updated: {data}", sub_id);
+                        let announced_topic = {
+                            let topics = announced_topics.read().await;
+                            topics.get(&id).expect("announced topic before sending updates").clone()
+                        };
+                        Some(ReceivedMessage::Updated((announced_topic, data.clone())))
+                    },
+                    ClientboundData::Text(ClientboundTextData::Announce(ref announce)) => {
+                        let matches = announced_topics.read().await.get(&announce.id).is_some_and(|topic| topic.matches(topics, options));
+                        if matches {
+                            topic_ids.write().await.insert(announce.id);
+                            Some(ReceivedMessage::Announced(announce.into()))
+                        } else { None }
+                    },
+                    ClientboundData::Text(ClientboundTextData::Unannounce(ref unannounce)) => {
+                        topic_ids.write().await.remove(&unannounce.id).then(|| {
+                            ReceivedMessage::Unannounced { name: unannounce.name.clone(), id: unannounce.id }
+                        })
+                    },
+                    // TODO: handle ClientboundTextData::Properties
+                    _ => None,
+                }
             }
         }).await
     }
@@ -101,7 +161,7 @@ impl<T: NetworkTableData> Subscriber<T> {
     // TODO: update method
 }
 
-impl<T: NetworkTableData> Drop for Subscriber<T> {
+impl Drop for Subscriber {
     fn drop(&mut self) {
         let unsub_message = ServerboundTextData::Unsubscribe(Unsubscribe { subuid: self.id });
         // if the receiver is dropped, the ws connection is closed
@@ -110,22 +170,24 @@ impl<T: NetworkTableData> Drop for Subscriber<T> {
     }
 }
 
-/// Errors that can occur when creating a new [`Subscriber`].
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-pub enum NewSubscriberError {
-    /// An error occurred when receiving data from the connection.
-    #[error(transparent)]
-    Recv(#[from] broadcast::error::RecvError),
-    /// The server and client have mismatched data types.
+/// Messages that can received from a subscriber.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ReceivedMessage {
+    /// A topic that matches the subscription options and subscribed topics was announced.
     ///
-    /// This can occur if, for example, the client is subscribing to a topic and expecting
-    /// [`String`]s, but the server has a different data type stored, like an [`i32`].
-    #[error("mismatched data types! server has {server:?}, but tried to use {client:?} instead")]
-    MismatchedType {
-        /// The server's data type.
-        server: DataType,
-        /// The client's data type.
-        client: DataType,
+    /// This will always be received before any updates for that topic are sent.
+    Announced(AnnouncedTopic),
+    /// An subscribed topic was updated.
+    ///
+    /// Subscribed topics are any topics that were [`Announced`][`ReceivedMessage::Announced`].
+    /// Only the most recent updated value is sent.
+    Updated((AnnouncedTopic, rmpv::Value)),
+    /// An announced topic was unannounced.
+    Unannounced {
+        /// The name of the topic that was unannounced.
+        name: String,
+        /// The id of the topic that was unannounced.
+        id: i32,
     },
 }
 

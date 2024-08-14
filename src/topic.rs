@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use tokio::sync::RwLock;
+use tokio::sync::{broadcast, RwLock};
 
 use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::Subscriber, NTClientSender, NTServerSender, NetworkTablesTime};
 
@@ -20,6 +20,7 @@ use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, Properties, S
 pub struct Topic {
     name: String,
     time: Arc<RwLock<NetworkTablesTime>>,
+    announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
     response_timeout: Duration,
     send_ws: NTServerSender,
     recv_ws: NTClientSender,
@@ -38,11 +39,12 @@ impl Topic {
     pub(super) fn new(
         name: String,
         time: Arc<RwLock<NetworkTablesTime>>,
+        announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
         response_timeout: Duration,
         send_ws: NTServerSender,
         recv_ws: NTClientSender,
     ) -> Self {
-        Self { name, time, response_timeout, send_ws, recv_ws }
+        Self { name, time, announced_topics, response_timeout, send_ws, recv_ws }
     }
 
     /// Publishes to this topic with the data type `T`.
@@ -57,16 +59,13 @@ impl Topic {
         Publisher::new(self.name.clone(), properties, self.time.clone(), self.response_timeout, self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 
-    /// Subscribes to this topic with the data type `T`.
+    /// Subscribes to this topic.
     ///
-    /// # Note
-    /// This method requires the [`Client`] websocket connection to already be made. Calling this
-    /// method wihout already connecting the [`Client`] will cause it to hang forever. Solving this
-    /// requires running this method in a separate thread, through something like [`tokio::spawn`].
+    /// This method does not require the [`Client`] websocket connection to be made.
     ///
     /// [`Client`]: crate::Client
-    pub async fn subscribe<T: NetworkTableData>(&self, options: SubscriptionOptions) -> Result<Subscriber<T>, NewSubscriberError> {
-        Subscriber::new(vec![self.name.clone()], options, self.send_ws.clone(), self.recv_ws.subscribe()).await
+    pub async fn subscribe(&self, options: SubscriptionOptions) -> Result<Subscriber, broadcast::error::RecvError> {
+        Subscriber::new(vec![self.name.clone()], options, self.announced_topics.clone(), self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 
     // TODO: subscribe to multiple topics
