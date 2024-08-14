@@ -404,3 +404,16 @@ where F: FnMut(Arc<ClientboundData>) -> Option<T>
     };
 }
 
+pub(crate) async fn recv_until_async<T, F, Fu>(recv_ws: &mut NTClientReceiver, mut filter: F) -> Result<T, broadcast::error::RecvError>
+where
+    Fu: Future<Output = Option<T>>,
+    F: FnMut(Arc<ClientboundData>) -> Fu,
+{
+    loop {
+        if let Some(data) = filter(recv_ws.recv().await?).await {
+            return Ok(data);
+        }
+    };
+}
+
+
