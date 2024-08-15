@@ -1,11 +1,40 @@
 //! `NetworkTables` client error types.
 
+use tokio::task::JoinError;
 use tokio_tungstenite::tungstenite;
 
 /// Error that means the `NetworkTables` connection was closed.
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, Hash)]
 #[error("the ws connection was closed")]
 pub struct ConnectionClosedError;
+
+/// Errors than can occur when connecting to a `NetworkTables` server.
+#[derive(thiserror::Error, Debug)]
+pub enum ConnectError {
+    /// An error occurred with the websocket.
+    #[error("websocket error: {0}")]
+    WebsocketError(#[from] tungstenite::Error),
+
+    /// An error occurred when joining multiple tasks together.
+    #[error(transparent)]
+    Join(#[from] JoinError),
+
+    /// An error occurred when pinging the server.
+    #[error(transparent)]
+    Ping(#[from] PingError),
+
+    /// An error occurred when updating client time.
+    #[error(transparent)]
+    UpdateTime(#[from] UpdateTimeError),
+
+    /// An error occurred when sending messages to the server.
+    #[error(transparent)]
+    SendMessage(#[from] SendMessageError),
+
+    /// An error ocurred when receiving messages from the server.
+    #[error(transparent)]
+    ReceiveMessage(#[from] ReceiveMessageError),
+}
 
 /// Errors that can occur when pinging the `NetworkTables` server.
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, Hash)]

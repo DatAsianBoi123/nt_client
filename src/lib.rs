@@ -37,12 +37,12 @@ use core::panic;
 use std::{collections::{HashMap, VecDeque}, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
 
 use data::{BinaryData, ClientboundData, ClientboundDataFrame, ClientboundTextData, ServerboundMessage, Unannounce};
-use error::{ConnectionClosedError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
+use error::{ConnectError, ConnectionClosedError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
 use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt, TryStreamExt};
-use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::{JoinError, JoinHandle}, time::{interval, timeout}};
-use tokio_tungstenite::{tungstenite::{self, Message}, MaybeTlsStream, WebSocketStream};
+use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
+use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use topic::{AnnouncedTopic, Topic};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 pub mod error;
 pub mod data;
@@ -381,34 +381,6 @@ impl NTAddr {
         };
         Some(addr)
     }
-}
-
-/// Errors than can occur when connecting to a `NetworkTables` server.
-#[derive(thiserror::Error, Debug)]
-pub enum ConnectError {
-    /// An error occurred with the websocket.
-    #[error("websocket error: {0}")]
-    WebsocketError(#[from] tungstenite::Error),
-
-    /// An error occurred when joining multiple tasks together.
-    #[error(transparent)]
-    Join(#[from] JoinError),
-
-    /// An error occurred when pinging the server.
-    #[error(transparent)]
-    Ping(#[from] PingError),
-
-    /// An error occurred when updating client time.
-    #[error(transparent)]
-    UpdateTime(#[from] UpdateTimeError),
-
-    /// An error occurred when sending messages to the server.
-    #[error(transparent)]
-    SendMessage(#[from] SendMessageError),
-
-    /// An error ocurred when receiving messages from the server.
-    #[error(transparent)]
-    ReceiveMessage(#[from] ReceiveMessageError),
 }
 
 /// Time information about a `NetworkTables` server and client.
