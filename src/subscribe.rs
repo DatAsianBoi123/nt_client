@@ -51,6 +51,9 @@ use crate::{data::{BinaryData, ClientboundData, ClientboundTextData, Serverbound
 
 /// A `NetworkTables` subscriber that subscribes to a [`Topic`].
 ///
+/// Subscribers receive topic announcements, value updates, topic unannouncements, and topic
+/// property change messages.
+///
 /// This will automatically get unsubscribed whenever this goes out of scope.
 ///
 /// [`Topic`]: crate::topic::Topic
@@ -125,6 +128,9 @@ impl Subscriber {
     }
 
     /// Receives the next value for this subscriber.
+    ///
+    /// Topics that have already been announced will not be received by this method. To view
+    /// all topics that are being subscribed to, use the [`topics`][`Self::topics`] method.
     pub async fn recv(&mut self) -> Result<ReceivedMessage, broadcast::error::RecvError> {
         recv_until_async(&mut self.ws_recv, |data| {
             let topic_ids = self.topic_ids.clone();
