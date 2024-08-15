@@ -43,6 +43,7 @@
 
 use std::{collections::{HashMap, HashSet}, sync::Arc, time::Duration};
 
+use futures_util::future::join_all;
 use tokio::sync::{broadcast, RwLock};
 use tracing::debug;
 
@@ -107,6 +108,20 @@ impl Subscriber {
             ws_sender,
             ws_recv
         }
+    }
+
+    /// Returns all topics that this subscriber is subscribed to.
+    pub async fn topics(&self) -> HashMap<i32, AnnouncedTopic> {
+        let topic_ids = self.topic_ids.clone();
+        let topic_ids = topic_ids.read().await;
+        let mapped_futures = topic_ids.iter()
+            .map(|id| {
+                let announced_topics = self.announced_topics.clone();
+                async move {
+                    (*id, announced_topics.read().await[id].clone())
+                }
+            });
+        join_all(mapped_futures).await.into_iter().collect()
     }
 
     /// Receives the next value for this subscriber.
