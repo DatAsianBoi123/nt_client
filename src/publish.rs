@@ -60,7 +60,6 @@ impl<T: NetworkTableData> PartialEq for Publisher<T> {
 impl<T: NetworkTableData> Eq for Publisher<T> { }
 
 impl<T: NetworkTableData> Publisher<T> {
-    // NOTE: pub(super) or pub?
     pub(super) async fn new(
         name: String,
         properties: Properties,

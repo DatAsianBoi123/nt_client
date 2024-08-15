@@ -1,4 +1,3 @@
-// TODO: use less `expect` and `unwrap`!!
 // TODO: inconsistencies with Gets and Returns in docs
 
 #![warn(missing_docs)]
@@ -369,7 +368,6 @@ impl Default for NTAddr {
 
 impl NTAddr {
     /// Converts this into an [`Ipv4Addr`].
-    // NOTE: return Result instead of Option?
     pub fn into_addr(self) -> Option<Ipv4Addr> {
         let addr = match self {
             NTAddr::TeamNumber(team_number) => {
@@ -446,7 +444,6 @@ impl NetworkTablesTime {
     }
 }
 
-// TODO: custom `RecvError` struct instead of using tokio one?
 pub(crate) async fn recv_until<T, F>(recv_ws: &mut NTClientReceiver, mut filter: F) -> Result<T, broadcast::error::RecvError>
 where F: FnMut(Arc<ClientboundData>) -> Option<T>
 {

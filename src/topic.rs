@@ -35,7 +35,6 @@ impl PartialEq for Topic {
 impl Eq for Topic { }
 
 impl Topic {
-    // NOTE: pub(super) or just pub?
     pub(super) fn new(
         name: String,
         time: Arc<RwLock<NetworkTablesTime>>,

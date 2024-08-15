@@ -75,7 +75,6 @@ impl PartialEq for Subscriber {
 impl Eq for Subscriber { }
 
 impl Subscriber {
-    // NOTE: pub(super) or pub?
     pub(super) async fn new(
         topics: Vec<String>,
         options: SubscriptionOptions,
