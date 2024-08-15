@@ -110,3 +110,14 @@ pub enum ReceiveMessageError {
     FailedDeserializingMsgPack(#[from] rmp_serde::decode::Error),
 }
 
+/// Errors that can occur when converting an [`NTAddr`] to an [`Ipv4Addr`]
+///
+/// [`NTAddr`]: crate::NTAddr
+/// [`Ipv4Addr`]: std::net::Ipv4Addr
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+pub enum IntoAddrError {
+    /// The team number is greater than 25599.
+    #[error("team number {0} is greater than 25599")]
+    InvalidTeamNumber(u16),
+}
+

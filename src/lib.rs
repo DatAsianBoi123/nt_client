@@ -37,7 +37,7 @@ use core::panic;
 use std::{collections::{HashMap, VecDeque}, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
 
 use data::{BinaryData, ClientboundData, ClientboundDataFrame, ClientboundTextData, ServerboundMessage, Unannounce};
-use error::{ConnectError, ConnectionClosedError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
+use error::{ConnectError, ConnectionClosedError, IntoAddrError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
 use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt, TryStreamExt};
 use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
@@ -81,7 +81,10 @@ impl Client {
     /// # Panics
     /// Panics if the [`NTAddr::TeamNumber`] team number is greater than 25599.
     pub fn new(options: NewClientOptions) -> Self {
-        let addr = if let Some(addr) = options.addr.into_addr() { addr } else { panic!("team_number is greater than 25599"); };
+        let addr = match options.addr.into_addr() {
+            Ok(addr) => addr,
+            Err(err) => panic!("{err}"),
+        };
 
         Client {
             addr: SocketAddrV4::new(addr, options.port),
@@ -368,10 +371,10 @@ impl Default for NTAddr {
 
 impl NTAddr {
     /// Converts this into an [`Ipv4Addr`].
-    pub fn into_addr(self) -> Option<Ipv4Addr> {
+    pub fn into_addr(self) -> Result<Ipv4Addr, IntoAddrError> {
         let addr = match self {
             NTAddr::TeamNumber(team_number) => {
-                if team_number > 25599 { return None; };
+                if team_number > 25599 { return Err(IntoAddrError::InvalidTeamNumber(team_number)); };
                 let first_section = team_number / 100;
                 let last_two = team_number % 100;
                 Ipv4Addr::new(10, first_section.try_into().unwrap(), last_two.try_into().unwrap(), 2)
@@ -379,7 +382,7 @@ impl NTAddr {
             NTAddr::Local => Ipv4Addr::LOCALHOST,
             NTAddr::Custom(addr) => addr,
         };
-        Some(addr)
+        Ok(addr)
     }
 }
 
