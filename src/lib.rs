@@ -38,8 +38,9 @@ use core::panic;
 use std::{collections::{HashMap, VecDeque}, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
 
 use data::{BinaryData, ClientboundData, ClientboundDataFrame, ClientboundTextData, ServerboundMessage, Unannounce};
-use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt};
-use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
+use error::{ConnectionClosedError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
+use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt, TryStreamExt};
+use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::{JoinError, JoinHandle}, time::{interval, timeout}};
 use tokio_tungstenite::{tungstenite::{self, Message}, MaybeTlsStream, WebSocketStream};
 use topic::{AnnouncedTopic, Topic};
 use tracing::{debug, error, info};
@@ -139,28 +140,31 @@ impl Client {
         let write_task = Client::start_write_task(self.send_ws.1, write);
         let read_task = Client::start_read_task(read, update_time_sender, pong_notify_send, announced_topics, self.recv_ws.0);
 
-        // TODO: actual error handling here
-        select! {
-            _ = ping_task => error!("interval pinger stopped!"),
-            _ = write_task => error!("write task stopped!"),
-            _ = read_task => error!("read task stopped!"),
-            _ = update_time_task => error!("update time stopped!"),
+        let result = select! {
+            task = ping_task => task?.map_err(|err| err.into()),
+            task = write_task => task?.map_err(|err| err.into()),
+            task = read_task => task?.map_err(|err| err.into()),
+            task = update_time_task => task?.map_err(|err| err.into()),
         };
         info!("closing connection");
-        Ok(())
+        result
     }
 
-    fn start_ping_task(pong_recv: Arc<Notify>, ws_sender: NTServerSender, ping_interval: Duration, response_timeout: Duration) -> JoinHandle<()> {
+    fn start_ping_task(
+        pong_recv: Arc<Notify>,
+        ws_sender: NTServerSender,
+        ping_interval: Duration,
+        response_timeout: Duration,
+    ) -> JoinHandle<Result<(), PingError>> {
         tokio::spawn(async move {
             let mut interval = interval(ping_interval);
             interval.tick().await;
             loop {
                 interval.tick().await;
-                ws_sender.send(ServerboundMessage::Ping.into()).expect("receiver still exists");
+                ws_sender.send(ServerboundMessage::Ping.into()).map_err(|_| ConnectionClosedError)?;
 
                 if (timeout(response_timeout, pong_recv.notified()).await).is_err() {
-                    // TODO: reconnect instead of panicking
-                    panic!("pong not received within 1 second! terminating connection");
+                    return Err(PingError::PongTimeout);
                 }
             }
         })
@@ -171,7 +175,7 @@ impl Client {
         time: Arc<RwLock<NetworkTablesTime>>,
         ws_sender: NTServerSender,
         mut time_recv: mpsc::Receiver<(Duration, Duration)>,
-    ) -> JoinHandle<()> {
+    ) -> JoinHandle<Result<(), UpdateTimeError>> {
         tokio::spawn(async move {
             let mut interval = interval(update_time_interval);
             loop {
@@ -182,8 +186,8 @@ impl Client {
                     time.client_time()
                 };
                 // TODO: handle client time overflow
-                let data = BinaryData::new::<u64>(-1, Duration::ZERO, client_time.as_micros().try_into().expect("client time overflowed"));
-                ws_sender.send(ServerboundMessage::Binary(data).into()).expect("receiver still exists");
+                let data = BinaryData::new::<u64>(-1, Duration::ZERO, client_time.as_micros().try_into().map_err(|_| UpdateTimeError::TimeOverflow)?);
+                ws_sender.send(ServerboundMessage::Binary(data).into()).map_err(|_| ConnectionClosedError)?;
 
                 if let Some((timestamp, client_send_time)) = time_recv.recv().await {
                     let offset = {
@@ -205,17 +209,23 @@ impl Client {
     fn start_write_task(
         mut server_recv: NTServerReceiver,
         mut write: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
-    ) -> JoinHandle<()> {
+    ) -> JoinHandle<Result<(), SendMessageError>> {
         tokio::spawn(async move {
             while let Ok(message) = server_recv.recv().await {
                 let packet = match &*message {
-                    ServerboundMessage::Text(json) => Message::Text(serde_json::to_string(&[json]).expect("can serialize to json")),
-                    ServerboundMessage::Binary(binary) => Message::Binary(rmp_serde::to_vec(binary).expect("can serialize to binary")),
-                    ServerboundMessage::Ping => Message::Ping(Vec::new()),
+                    ServerboundMessage::Text(json) => serde_json::to_string(&[json]).map_err(|err| err.into()).map(Message::Text),
+                    ServerboundMessage::Binary(binary) => rmp_serde::to_vec(binary).map_err(|err| err.into()).map(Message::Binary),
+                    ServerboundMessage::Ping => Ok(Message::Ping(Vec::new())),
                 };
-                if !matches!(packet, Message::Ping(_)) { debug!("sent message: {packet:?}"); };
-                write.send(packet).await.expect("can send message");
-            }
+                match packet {
+                    Ok(packet) => {
+                        if !matches!(packet, Message::Ping(_)) { debug!("sent message: {packet:?}"); };
+                        if (write.send(packet).await).is_err() { return Err(SendMessageError::ConnectionClosed(ConnectionClosedError)); };
+                    },
+                    Err(err) => return Err(err),
+                };
+            };
+            Ok(())
         })
     }
 
@@ -225,35 +235,33 @@ impl Client {
         pong_send: Arc<Notify>,
         announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
         client_sender: NTClientSender,
-    ) -> JoinHandle<()> {
+    ) -> JoinHandle<Result<(), ReceiveMessageError>> {
         tokio::spawn(async move {
-            read.for_each(|message| async {
-                let message = message.expect("can read message");
-
+            read.err_into().try_for_each(|message| async {
                 let message = match message {
                     Message::Binary(binary) => {
                         let mut binary = VecDeque::from(binary);
                         let mut binary_data = Vec::new();
-                        while let Ok(binary) = rmp_serde::from_read::<&mut VecDeque<u8>, BinaryData>(&mut binary) {
+                        while !binary_data.is_empty() {
+                            let binary = rmp_serde::from_read::<&mut VecDeque<u8>, BinaryData>(&mut binary)?;
                             if binary.id == -1 {
                                 let client_send_time = Duration::from_micros(binary.data.as_u64().expect("timestamp data is u64"));
-                                update_time_sender.send((binary.timestamp, client_send_time)).await.expect("receiver exists");
+                                if update_time_sender.send((binary.timestamp, client_send_time)).await.is_err() {
+                                    return Err(ReceiveMessageError::ConnectionClosed(ConnectionClosedError));
+                                };
                             }
-
                             binary_data.push(binary);
                         };
                         Some(ClientboundDataFrame::Binary(binary_data))
                     },
                     Message::Text(json) => {
-                        let json = serde_json::from_str(&json).expect("can deserialize to json");
-                        Some(ClientboundDataFrame::Text(json))
+                        Some(ClientboundDataFrame::Text(serde_json::from_str(&json)?))
                     },
                     Message::Pong(_) => {
                         pong_send.notify_one();
                         None
                     },
-                    // TODO: reconnect instead of panicking
-                    Message::Close(_) => panic!("websocket closed"),
+                    Message::Close(_) => return Err(ReceiveMessageError::ConnectionClosed(ConnectionClosedError)),
                     _ => None,
                 };
 
@@ -273,10 +281,12 @@ impl Client {
                             _ => (),
                         }
 
-                        client_sender.send(data.into()).expect("receivers exist");
+                        client_sender.send(data.into()).map_err(|_| ConnectionClosedError)?;
                     }
                 };
-            }).await;
+
+                Ok(())
+            }).await
         })
     }
 }
@@ -381,6 +391,26 @@ pub enum ConnectError {
     /// An error occurred with the websocket.
     #[error("websocket error: {0}")]
     WebsocketError(#[from] tungstenite::Error),
+
+    /// An error occurred when joining multiple tasks together.
+    #[error(transparent)]
+    Join(#[from] JoinError),
+
+    /// An error occurred when pinging the server.
+    #[error(transparent)]
+    Ping(#[from] PingError),
+
+    /// An error occurred when updating client time.
+    #[error(transparent)]
+    UpdateTime(#[from] UpdateTimeError),
+
+    /// An error occurred when sending messages to the server.
+    #[error(transparent)]
+    SendMessage(#[from] SendMessageError),
+
+    /// An error ocurred when receiving messages from the server.
+    #[error(transparent)]
+    ReceiveMessage(#[from] ReceiveMessageError),
 }
 
 /// Time information about a `NetworkTables` server and client.
