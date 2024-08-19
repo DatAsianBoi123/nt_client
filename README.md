@@ -17,8 +17,8 @@ This is meant to be used within coprocessors that can send and receive data from
 - [x] Publishing to a topic
 - [x] 100% documentation coverage
 - [x] Proper logging (instead of println!)
-- [ ] Examples
-- [ ] Better error handling (less `.expect`)
+- [x] Examples
+- [x] Better error handling (less `.expect`)
 - [ ] Reconnections
 - [ ] Caching
 
