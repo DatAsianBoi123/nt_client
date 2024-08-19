@@ -45,12 +45,14 @@ async fn main() {
         let publisher = pub_topic.publish::<u32>(Default::default()).await.expect("can publish to topic");
         let mut counter = 0;
 
+        publisher.set_default(counter).await;
+
         loop {
-            println!("updated counter to {counter}");
-            publisher.set(counter).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             counter += 1;
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            println!("updated counter to {counter}");
+            publisher.set(counter).await;
         }
     });
 
