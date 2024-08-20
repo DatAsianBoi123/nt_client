@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use nt_client::{data::{r#type::NetworkTableData, SubscriptionOptions}, subscribe::ReceivedMessage, Client, NTAddr, NewClientOptions};
+use nt_client::{data::r#type::NetworkTableData, subscribe::ReceivedMessage, Client, NTAddr, NewClientOptions};
 use tracing::level_filters::LevelFilter;
 
 #[tokio::main]
@@ -22,7 +22,7 @@ async fn main() {
     // changes include the announcement of a topic, an updated value, and an unannouncement of a topic
     let sub_topic = client.topic("/topic");
     tokio::spawn(async move {
-        let mut subscriber = sub_topic.subscribe(SubscriptionOptions { prefix: Some(true), ..Default::default() }).await;
+        let mut subscriber = sub_topic.subscribe(Default::default()).await;
 
         loop {
             match subscriber.recv().await {
@@ -34,7 +34,10 @@ async fn main() {
                 Ok(ReceivedMessage::Unannounced { name, .. }) => {
                     println!("topic {name} unannounced");
                 },
-                Err(_) => break,
+                Err(err) => {
+                    eprint!("{err:?}");
+                    break;
+                },
             }
         }
     });
