@@ -117,7 +117,7 @@ impl Client {
 
     /// Returns a new topic with a given name.
     pub fn topic(&self, name: impl ToString) -> Topic {
-        Topic::new(name.to_string(), self.time(), self.announced_topics.clone(), self.response_timeout, self.send_ws.0.clone(), self.recv_ws.0.clone())
+        Topic::new(name.to_string(), self.time(), self.announced_topics.clone(), self.send_ws.0.clone(), self.recv_ws.0.clone())
     }
 
     /// Connects to the `NetworkTables` server.

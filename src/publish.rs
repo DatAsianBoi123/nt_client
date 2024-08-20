@@ -33,7 +33,7 @@
 
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
-use tokio::{sync::{broadcast, RwLock}, time::timeout};
+use tokio::sync::{broadcast, RwLock};
 use tracing::debug;
 
 use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, recv_until, NTClientReceiver, NTServerSender, NetworkTablesTime};
@@ -64,7 +64,6 @@ impl<T: NetworkTableData> Publisher<T> {
         name: String,
         properties: Properties,
         time: Arc<RwLock<NetworkTablesTime>>,
-        timeout_duration: Duration,
         ws_sender: NTServerSender,
         mut ws_recv: NTClientReceiver,
     ) -> Result<Self, NewPublisherError> {
@@ -72,7 +71,7 @@ impl<T: NetworkTableData> Publisher<T> {
         let pub_message = ServerboundTextData::Publish(Publish { name, pubuid: id, r#type: T::data_type(), properties });
         ws_sender.send(ServerboundMessage::Text(pub_message).into()).map_err(|_| broadcast::error::RecvError::Closed)?;
 
-        let (name, r#type, id) = timeout(timeout_duration, async move {
+        let (name, r#type, id) = {
             recv_until(&mut ws_recv, |data| {
                 if let ClientboundData::Text(ClientboundTextData::Announce(Announce { ref name, ref r#type, pubuid: Some(pubuid), .. })) = *data {
                     // TODO: cached property
@@ -82,7 +81,7 @@ impl<T: NetworkTableData> Publisher<T> {
                     None
                 }
             }).await
-        }).await.map_err(|_| NewPublisherError::NoResponse)??;
+        }?;
         if T::data_type() != r#type { return Err(NewPublisherError::MismatchedType { server: r#type, client: T::data_type() }); };
 
         debug!("[pub {id}] publishing to topic `{name}`");
@@ -130,11 +129,6 @@ pub enum NewPublisherError {
     /// An error occurred when receiving data from the connection.
     #[error(transparent)]
     Recv(#[from] broadcast::error::RecvError),
-    /// The server didn't respond to the publish within the response timeout specified in [`NewClientOptions`].
-    ///
-    /// [`NewClientOptions`]: crate::NewClientOptions
-    #[error("server didn't respond with announce")]
-    NoResponse,
     /// The server and client have mismatched data types.
     ///
     /// This can occur if, for example, the client is publishing [`String`]s to a topic that the

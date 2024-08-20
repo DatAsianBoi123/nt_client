@@ -2,7 +2,7 @@
 //!
 //! Topics have a fixed data type and can be subscribed and published to.
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
@@ -21,7 +21,6 @@ pub struct Topic {
     name: String,
     time: Arc<RwLock<NetworkTablesTime>>,
     announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
-    response_timeout: Duration,
     send_ws: NTServerSender,
     recv_ws: NTClientSender,
 }
@@ -39,11 +38,10 @@ impl Topic {
         name: String,
         time: Arc<RwLock<NetworkTablesTime>>,
         announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
-        response_timeout: Duration,
         send_ws: NTServerSender,
         recv_ws: NTClientSender,
     ) -> Self {
-        Self { name, time, announced_topics, response_timeout, send_ws, recv_ws }
+        Self { name, time, announced_topics, send_ws, recv_ws }
     }
 
     /// Publishes to this topic with the data type `T`.
@@ -55,7 +53,7 @@ impl Topic {
     ///
     /// [`Client`]: crate::Client
     pub async fn publish<T: NetworkTableData>(&self, properties: Properties) -> Result<Publisher<T>, NewPublisherError> {
-        Publisher::new(self.name.clone(), properties, self.time.clone(), self.response_timeout, self.send_ws.clone(), self.recv_ws.subscribe()).await
+        Publisher::new(self.name.clone(), properties, self.time.clone(), self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 
     /// Subscribes to this topic.
