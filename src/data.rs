@@ -58,33 +58,9 @@ pub(crate) struct Unsubscribe {
 }
 
 #[derive(Debug)]
-pub(crate) enum ClientboundDataFrame {
-    Text(Vec<ClientboundTextData>),
-    Binary(Vec<BinaryData>),
-}
-
-impl IntoIterator for ClientboundDataFrame {
-    type Item = ClientboundData;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Into::<Vec<ClientboundData>>::into(self).into_iter()
-    }
-}
-
-#[derive(Debug)]
 pub(crate) enum ClientboundData {
     Text(ClientboundTextData),
     Binary(BinaryData),
-}
-
-impl From<ClientboundDataFrame> for Vec<ClientboundData> {
-    fn from(value: ClientboundDataFrame) -> Self {
-        match value {
-            ClientboundDataFrame::Text(data) => data.into_iter().map(ClientboundData::Text).collect(),
-            ClientboundDataFrame::Binary(data) => data.into_iter().map(ClientboundData::Binary).collect(),
-        }
-    }
 }
 
 #[derive(Deserialize, Debug)]

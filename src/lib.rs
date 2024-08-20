@@ -36,7 +36,7 @@
 use core::panic;
 use std::{collections::{HashMap, VecDeque}, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
 
-use data::{BinaryData, ClientboundData, ClientboundDataFrame, ClientboundTextData, ServerboundMessage, Unannounce};
+use data::{BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, Unannounce};
 use error::{ConnectError, ConnectionClosedError, IntoAddrError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
 use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt, TryStreamExt};
 use time::ext::InstantExt;
@@ -257,12 +257,12 @@ impl Client {
                                     return Err(ReceiveMessageError::ConnectionClosed(ConnectionClosedError));
                                 };
                             }
-                            binary_data.push(binary);
+                            binary_data.push(ClientboundData::Binary(binary));
                         };
-                        Some(ClientboundDataFrame::Binary(binary_data))
+                        Some(binary_data)
                     },
                     Message::Text(json) => {
-                        Some(ClientboundDataFrame::Text(serde_json::from_str(&json)?))
+                        Some(serde_json::from_str::<'_, Vec<ClientboundTextData>>(&json)?.into_iter().map(ClientboundData::Text).collect())
                     },
                     Message::Pong(_) => {
                         pong_send.notify_one();
