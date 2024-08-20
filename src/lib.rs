@@ -244,7 +244,7 @@ impl Client {
                     Message::Binary(binary) => {
                         let mut binary = VecDeque::from(binary);
                         let mut binary_data = Vec::new();
-                        while !binary_data.is_empty() {
+                        while !binary.is_empty() {
                             let binary = rmp_serde::from_read::<&mut VecDeque<u8>, BinaryData>(&mut binary)?;
                             if binary.id == -1 {
                                 let client_send_time = Duration::from_micros(binary.data.as_u64().expect("timestamp data is u64"));
@@ -280,7 +280,7 @@ impl Client {
                                 announced_topics.remove(id);
                             },
                             // TODO: handle Properties
-                            _ => (),
+                            _ => {},
                         }
 
                         client_sender.send(data.into()).map_err(|_| ConnectionClosedError)?;
