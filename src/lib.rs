@@ -39,6 +39,7 @@ use std::{collections::{HashMap, VecDeque}, convert::Into, net::{Ipv4Addr, Socke
 use data::{BinaryData, ClientboundData, ClientboundDataFrame, ClientboundTextData, ServerboundMessage, Unannounce};
 use error::{ConnectError, ConnectionClosedError, IntoAddrError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
 use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt, TryStreamExt};
+use time::ext::InstantExt;
 use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use topic::{AnnouncedTopic, Topic};
@@ -188,7 +189,11 @@ impl Client {
                     time.client_time()
                 };
                 // TODO: handle client time overflow
-                let data = BinaryData::new::<u64>(-1, Duration::ZERO, client_time.as_micros().try_into().map_err(|_| UpdateTimeError::TimeOverflow)?);
+                let data = BinaryData::new::<u64>(
+                    -1,
+                    Duration::ZERO,
+                    client_time.whole_microseconds().try_into().map_err(|_| UpdateTimeError::TimeOverflow)?,
+                );
                 ws_sender.send(ServerboundMessage::Binary(data).into()).map_err(|_| ConnectionClosedError)?;
 
                 if let Some((timestamp, client_send_time)) = time_recv.recv().await {
@@ -392,7 +397,7 @@ impl NTAddr {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NetworkTablesTime {
     started: Instant,
-    offset: Duration,
+    offset: time::Duration,
 }
 
 impl Default for NetworkTablesTime {
@@ -405,17 +410,24 @@ impl NetworkTablesTime {
     /// Creates a new `NetworkTablesTime` with the client start time of [`Instant::now`] and a
     /// server offset time of [`Duration::ZERO`].
     pub fn new() -> Self {
-        Self { started: Instant::now(), offset: Duration::ZERO }
+        Self { started: Instant::now(), offset: time::Duration::ZERO }
     }
 
     /// Returns the current client time.
-    pub fn client_time(&self) -> Duration {
-        Instant::now().duration_since(self.started)
+    pub fn client_time(&self) -> time::Duration {
+        Instant::now().signed_duration_since(self.started)
     }
 
     /// Returns the current server time.
+    ///
+    /// # Panics
+    /// Panics if the calculated server time is negative. This should never happen and be reported
+    /// if it does.
     pub fn server_time(&self) -> Duration {
-        self.client_time() + self.offset
+        match (self.client_time() + self.offset).try_into() {
+            Ok(duration) => duration,
+            Err(_) => panic!("expected server time to be positive"),
+        }
     }
 }
 
