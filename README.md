@@ -31,27 +31,7 @@ Or run the following command in your project root
 ```
 cargo add nt_client
 ```
-## Example
-A basic subscriber that prints changes to `stdout`
 
-```rust
-use nt_client::{subscribe::ReceivedMessage, Client, NewClientOptions, NTAddr};
-
-#[tokio::main]
-async fn main() {
-    let options = NewClientOptions { addr: NTAddr::Local, ..Default::default() };
-    let client = Client::new(options);
-
-    let thing_topic = client.topic("/thing");
-    tokio::spawn(async move {
-        let mut sub = thing_topic.subscribe(Default::default()).await;
-
-        while let Ok(ReceivedMessage::Updated((_topic, value))) = sub.recv().await {
-            println!("topic updated: '{value}'")
-        }
-    });
-
-    client.connect().await.unwrap();
-});
-```
+---
+See the `/examples` directory for examples on how to use this crate.
 
