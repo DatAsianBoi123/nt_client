@@ -1,6 +1,6 @@
 [package]
 name = "nt_client"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A blazingly fast NetworkTables 4.1 client"
 repository = "https://github.com/DatAsianBoi123/nt_client"
