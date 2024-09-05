@@ -32,14 +32,14 @@
 //! [NetworkTables]: https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc
 
 use core::panic;
-use std::{collections::{HashMap, VecDeque}, convert::Into, net::{Ipv4Addr, SocketAddrV4}, sync::Arc, time::{Duration, Instant}};
+use std::{collections::{HashMap, VecDeque}, convert::Into, net::Ipv4Addr, sync::Arc, time::{Duration, Instant}};
 
 use data::{BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, Unannounce};
 use error::{ConnectError, ConnectionClosedError, IntoAddrError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
 use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt, TryStreamExt};
 use time::ext::InstantExt;
 use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
-use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{tungstenite::{self, http::{Response, Uri}, ClientRequestBuilder, Message}, MaybeTlsStream, WebSocketStream};
 use topic::{AnnouncedTopic, Topic};
 use tracing::{debug, info};
 
@@ -61,7 +61,7 @@ pub(crate) type NTClientReceiver = broadcast::Receiver<Arc<ClientboundData>>;
 /// will be made.
 #[derive(Debug)]
 pub struct Client {
-    addr: SocketAddrV4,
+    addr: Ipv4Addr,
     options: NewClientOptions,
     time: Arc<RwLock<NetworkTablesTime>>,
     announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
@@ -82,7 +82,7 @@ impl Client {
         };
 
         Client {
-            addr: SocketAddrV4::new(addr, options.port),
+            addr,
             options,
             time: Default::default(),
             announced_topics: Default::default(),
@@ -115,10 +115,11 @@ impl Client {
     ///
     /// This future will only complete when the client has disconnected from the server.
     pub async fn connect(self) -> Result<(), ConnectError> {
-        // TODO: try connecting to wss first
-        let uri = format!("ws://{}/nt/{}", self.addr, self.options.name);
-        let (ws_stream, _) = tokio_tungstenite::connect_async(uri.clone()).await?;
-        info!("connected to server at {uri}");
+        let (ws_stream, _) = match self.try_connect("wss", self.options.secure_port).await {
+            Ok(ok) => ok,
+            Err(tungstenite::Error::Io(_)) => self.try_connect("ws", self.options.unsecure_port).await?,
+            Err(err) => return Err(err.into()),
+        };
 
         let (write, read) = ws_stream.split();
 
@@ -141,6 +142,24 @@ impl Client {
         };
         info!("closing connection");
         result
+    }
+
+    async fn try_connect(
+        &self,
+        scheme: &str,
+        port: u16,
+    ) -> Result<(WebSocketStream<MaybeTlsStream<TcpStream>>, Response<Option<Vec<u8>>>), tungstenite::Error> {
+        let uri: Uri = format!("{scheme}://{}:{port}/nt/{}", self.addr, self.options.name).try_into().expect("valid websocket uri");
+        let conn_str = uri.to_string();
+        debug!("attempting connection at {conn_str}");
+        let client_request = ClientRequestBuilder::new(uri)
+            .with_sub_protocol("v4.1.networktables.first.wpi.edu");
+
+        let res = tokio_tungstenite::connect_async(client_request).await;
+
+        if res.is_ok() { info!("connected to server at {conn_str}") };
+
+        res
     }
 
     fn start_ping_task(
@@ -297,8 +316,12 @@ pub struct NewClientOptions {
     pub addr: NTAddr,
     /// The port of the server.
     ///
-    /// Default is `5810` for unsecure connections and `5811` for secure ones.
-    pub port: u16,
+    /// Default is `5810`.
+    pub unsecure_port: u16,
+    /// The port of the server.
+    ///
+    /// Default is 5811`.
+    pub secure_port: u16,
     /// The name of the client.
     ///
     /// Default is `rust-client-{random u16}`
@@ -324,7 +347,8 @@ impl Default for NewClientOptions {
     fn default() -> Self {
         Self {
             addr: Default::default(),
-            port: 5810,
+            unsecure_port: 5810,
+            secure_port: 5811,
             name: format!("rust-client-{}", rand::random::<u16>()),
             response_timeout: Duration::from_secs(1),
             ping_interval: Duration::from_millis(200),
