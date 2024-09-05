@@ -197,7 +197,7 @@ impl DataType {
         }
     }
 
-    /// Gets this `DataType` as an id.
+    /// Returns this `DataType` as an id.
     ///
     /// It is guaranteed that the id mappings here match with the id mappings in
     /// [`from_id`](Self::from_id).

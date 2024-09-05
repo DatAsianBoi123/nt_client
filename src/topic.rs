@@ -83,24 +83,24 @@ pub struct AnnouncedTopic {
 }
 
 impl AnnouncedTopic {
-    /// Gets the name of this topic.
+    /// Returns the name of this topic.
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Gets the id of this topic.
+    /// Returns the id of this topic.
     ///
     /// This id is guaranteed to be unique.
     pub fn id(&self) -> i32 {
         self.id
     }
 
-    /// Gets the data type of this topic.
+    /// Returns the data type of this topic.
     pub fn r#type(&self) -> &DataType {
         &self.r#type
     }
 
-    /// Gets the properties of this topic.
+    /// Returns the properties of this topic.
     pub fn properties(&self) -> &Properties {
         &self.properties
     }

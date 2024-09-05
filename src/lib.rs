@@ -1,5 +1,3 @@
-// TODO: inconsistencies with Gets and Returns in docs
-
 #![warn(missing_docs)]
 
 //! A blazingly fast [NetworkTables 4.1][NetworkTables] client.
