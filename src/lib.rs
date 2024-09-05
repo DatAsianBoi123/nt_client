@@ -62,13 +62,9 @@ pub(crate) type NTClientReceiver = broadcast::Receiver<Arc<ClientboundData>>;
 #[derive(Debug)]
 pub struct Client {
     addr: SocketAddrV4,
-    name: String,
+    options: NewClientOptions,
     time: Arc<RwLock<NetworkTablesTime>>,
     announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
-
-    response_timeout: Duration,
-    ping_interval: Duration,
-    update_time_interval: Duration,
 
     send_ws: (NTServerSender, NTServerReceiver),
     recv_ws: (NTClientSender, NTClientReceiver),
@@ -80,20 +76,16 @@ impl Client {
     /// # Panics
     /// Panics if the [`NTAddr::TeamNumber`] team number is greater than 25599.
     pub fn new(options: NewClientOptions) -> Self {
-        let addr = match options.addr.into_addr() {
+        let addr = match options.addr.clone().into_addr() {
             Ok(addr) => addr,
             Err(err) => panic!("{err}"),
         };
 
         Client {
             addr: SocketAddrV4::new(addr, options.port),
-            name: options.name,
+            options,
             time: Default::default(),
             announced_topics: Default::default(),
-
-            response_timeout: options.response_timeout,
-            ping_interval: options.ping_interval,
-            update_time_interval: options.update_time_interval,
 
             send_ws: broadcast::channel(10),
             recv_ws: broadcast::channel(20),
@@ -124,7 +116,7 @@ impl Client {
     /// This future will only complete when the client has disconnected from the server.
     pub async fn connect(self) -> Result<(), ConnectError> {
         // TODO: try connecting to wss first
-        let uri = format!("ws://{}/nt/{}", self.addr, self.name);
+        let uri = format!("ws://{}/nt/{}", self.addr, self.options.name);
         let (ws_stream, _) = tokio_tungstenite::connect_async(uri.clone()).await?;
         info!("connected to server at {uri}");
 
@@ -132,10 +124,10 @@ impl Client {
 
         let pong_notify_recv = Arc::new(Notify::new());
         let pong_notify_send = pong_notify_recv.clone();
-        let ping_task = Client::start_ping_task(pong_notify_recv, self.send_ws.0.clone(), self.ping_interval, self.response_timeout);
+        let ping_task = Client::start_ping_task(pong_notify_recv, self.send_ws.0.clone(), self.options.ping_interval, self.options.response_timeout);
 
         let (update_time_sender, update_time_recv) = mpsc::channel(1);
-        let update_time_task = Client::start_update_time_task(self.update_time_interval, self.time(), self.send_ws.0.clone(), update_time_recv);
+        let update_time_task = Client::start_update_time_task(self.options.update_time_interval, self.time(), self.send_ws.0.clone(), update_time_recv);
 
         let announced_topics = self.announced_topics();
         let write_task = Client::start_write_task(self.send_ws.1, write);
