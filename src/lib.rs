@@ -41,7 +41,7 @@ use time::ext::InstantExt;
 use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
 use tokio_tungstenite::{tungstenite::{self, http::{Response, Uri}, ClientRequestBuilder, Message}, MaybeTlsStream, WebSocketStream};
 use topic::{AnnouncedTopic, Topic};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 pub mod error;
 pub mod data;
@@ -441,6 +441,57 @@ impl NetworkTablesTime {
         match (self.client_time() + self.offset).try_into() {
             Ok(duration) => duration,
             Err(_) => panic!("expected server time to be positive"),
+        }
+    }
+}
+
+/// Continuously calls `init` whenever it returns an error, effectively becoming a reconnect
+/// handler.
+///
+/// This function will only ever return if an [`Ok`][`Result::Ok`] value or a
+/// [`std::io::Error`] error is returned, returning that result.
+///
+/// # Examples
+/// ```no_run
+/// use nt_client::{subscribe::ReceivedMessage, Client};
+///
+/// # tokio_test::block_on(async {
+/// nt_client::reconnect(|| async {
+///     let mut client = Client::new(Default::default());
+///
+///     let topic = client.topic("/topic");
+///     let sub_task = tokio::spawn(async move {
+///         let mut subscriber = topic.subscribe(Default::default()).await;
+///
+///         while let Ok(ReceivedMessage::Updated((_, value))) = subscriber.recv().await {
+///             println!("updated: {value:?}");
+///         }
+///     });
+///
+///     // select! to make sure other tasks don't stay running
+///     tokio::select! {
+///         res = client.connect() => res,
+///         _ = sub_task => Ok(()),
+///     }
+/// }).await.unwrap();
+/// # })
+/// ```
+pub async fn reconnect<F, I>(mut init: I) -> Result<(), std::io::Error>
+where
+    F: Future<Output = Result<(), ConnectError>>,
+    I: FnMut() -> F,
+{
+    loop {
+        match init().await {
+            Ok(_) => return Ok(()),
+            Err(ConnectError::WebsocketError(tungstenite::Error::Io(err))) => {
+                error!("fatal error occurred: {err}");
+                return Err(err);
+            },
+            Err(err) => {
+                error!("client crashed! {err}");
+                info!("attempting to reconnect");
+            },
         }
     }
 }
