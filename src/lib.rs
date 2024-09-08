@@ -1,3 +1,5 @@
+// TODO: add # Errors header on functions that apply
+
 #![warn(missing_docs)]
 
 //! A blazingly fast [NetworkTables 4.1][NetworkTables] client.
