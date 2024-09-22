@@ -19,7 +19,7 @@ This is meant to be used within coprocessors that can send and receive data from
 - [x] Proper logging (instead of println!)
 - [x] Examples
 - [x] Better error handling (less `.expect`)
-- [ ] Reconnections
+- [x] Reconnections
 - [ ] Caching
 
 ## Installation
