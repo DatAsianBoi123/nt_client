@@ -36,7 +36,7 @@ use std::{marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, RwLock};
 use tracing::debug;
 
-use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, recv_until, NTClientReceiver, NTServerSender, NetworkTablesTime};
+use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, ClientboundData, ClientboundTextData, Properties, Publish, ServerboundMessage, ServerboundTextData, Unpublish}, error::ConnectionClosedError, recv_until, NTClientReceiver, NTServerSender, NetworkTablesTime};
 
 /// A `NetworkTables` publisher that publishes values to a [`Topic`].
 ///
@@ -91,7 +91,7 @@ impl<T: NetworkTableData> Publisher<T> {
     /// Publish a new value to the [`Topic`].
     ///
     /// [`Topic`]: crate::topic::Topic
-    pub async fn set(&self, value: T) {
+    pub async fn set(&self, value: T) -> Result<(), ConnectionClosedError> {
         let time = self.time.read().await;
         self.set_time(value, time.server_time()).await
     }
@@ -102,15 +102,16 @@ impl<T: NetworkTableData> Publisher<T> {
     /// been published to the [`Topic`] yet.
     ///
     /// [`Topic`]: crate::topic::Topic
-    pub async fn set_default(&self, value: T) {
+    pub async fn set_default(&self, value: T) -> Result<(), ConnectionClosedError> {
         self.set_time(value, Duration::ZERO).await
     }
 
-    async fn set_time(&self, data: T, timestamp: Duration) {
+    async fn set_time(&self, data: T, timestamp: Duration) -> Result<(), ConnectionClosedError> {
         let data_value = data.clone().into_value();
         let binary = BinaryData::new(self.id, timestamp, data);
-        self.ws_sender.send(ServerboundMessage::Binary(binary).into()).expect("receiver still exists");
+        self.ws_sender.send(ServerboundMessage::Binary(binary).into()).map_err(|_| ConnectionClosedError)?;
         debug!("[pub {}] set to {data_value} at time {timestamp:?}", self.id);
+        Ok(())
     }
 }
 
