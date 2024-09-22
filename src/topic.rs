@@ -292,14 +292,11 @@ impl From<&str> for TopicPath {
 
 impl From<String> for TopicPath {
     fn from(value: String) -> Self {
-        // TODO: fix this horrible code
-        let str = value.strip_prefix(Self::DELIMITER)
-            .map(|str| str.to_owned())
-            .unwrap_or(value);
+        let str = value.strip_prefix(Self::DELIMITER).unwrap_or(&value);
         let str = str
             .strip_suffix(Self::DELIMITER)
             .map(|str| str.to_owned())
-            .unwrap_or(str);
+            .unwrap_or_else(|| str.to_owned());
 
         str.chars().fold((VecDeque::<String>::new(), true), |(mut parts, prev_is_delimiter), char| {
             if prev_is_delimiter {
