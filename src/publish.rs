@@ -23,7 +23,7 @@
 //!     loop {
 //!         interval.tick().await;
 //!
-//!         publisher.set(counter).await;
+//!         publisher.set(counter).await.expect("connection is still alive");
 //!         counter += 1;
 //!     }
 //! });

@@ -48,14 +48,14 @@ async fn main() {
         let publisher = pub_topic.publish::<u32>(Default::default()).await.expect("can publish to topic");
         let mut counter = 0;
 
-        publisher.set_default(counter).await;
+        publisher.set_default(counter).await.expect("connection is still alive");
 
         loop {
             tokio::time::sleep(Duration::from_secs(1)).await;
             counter += 1;
 
             println!("updated counter to {counter}");
-            publisher.set(counter).await;
+            publisher.set(counter).await.expect("connection is still alive");
         }
     });
 
