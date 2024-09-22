@@ -1,5 +1,7 @@
 //! `NetworkTables` client error types.
 
+use std::error::Error;
+
 use tokio::task::JoinError;
 use tokio_tungstenite::tungstenite;
 
@@ -119,5 +121,37 @@ pub enum IntoAddrError {
     /// The team number is greater than 25599.
     #[error("team number {0} is greater than 25599")]
     InvalidTeamNumber(u16),
+}
+
+/// A potentially fatal error that occurs after reconnecting to a `NetworkTables` server.
+///
+/// This is used when creating a reconnect handler via [`crate::reconnect`], in which a
+/// [`Fatal`] variant indicates that no attempt to reconnect should be made,
+/// while a [`Nonfatal`] variant indicates that a reconnect attempt will be made.
+///
+/// A [`From<ConnectError>`][`From`] trait is implemented, constructing a [`Fatal`] variant if and only
+/// if it is a [`ConnectError::WebsocketError`] ([`tungstenite::error::Error::Io`]), otherwise it
+/// constructs a [`Nonfatal`] variant.
+///
+/// [`Fatal`]: ReconnectError::Fatal
+/// [`Nonfatal`]: ReconnectError::Nonfatal
+#[derive(thiserror::Error, Debug)]
+pub enum ReconnectError {
+    /// An unrecoverable error has occurred and no attempt to reconnect should be made.
+    #[error(transparent)]
+    Fatal(Box<dyn Error + Send + Sync>),
+
+    /// A recoverable error has occurred and reconnection will be attempted.
+    #[error(transparent)]
+    Nonfatal(Box<dyn Error + Send + Sync>),
+}
+
+impl From<ConnectError> for ReconnectError {
+    fn from(value: ConnectError) -> Self {
+        match value {
+            ConnectError::WebsocketError(tungstenite::Error::Io(error)) => Self::Fatal(error.into()),
+            err => Self::Nonfatal(err.into()),
+        }
+    }
 }
 

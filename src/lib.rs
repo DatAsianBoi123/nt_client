@@ -34,10 +34,10 @@
 //! [NetworkTables]: https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc
 
 use core::panic;
-use std::{collections::{HashMap, VecDeque}, convert::Into, net::Ipv4Addr, sync::Arc, time::{Duration, Instant}};
+use std::{collections::{HashMap, VecDeque}, convert::Into, error::Error, net::Ipv4Addr, sync::Arc, time::{Duration, Instant}};
 
 use data::{BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, Unannounce};
-use error::{ConnectError, ConnectionClosedError, IntoAddrError, PingError, ReceiveMessageError, SendMessageError, UpdateTimeError};
+use error::{ConnectError, ConnectionClosedError, IntoAddrError, PingError, ReceiveMessageError, ReconnectError, SendMessageError, UpdateTimeError};
 use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt, TryStreamExt};
 use time::ext::InstantExt;
 use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
@@ -447,50 +447,58 @@ impl NetworkTablesTime {
     }
 }
 
-/// Continuously calls `init` whenever it returns an error, effectively becoming a reconnect
-/// handler.
+/// Continuously calls `init` with a constructed [`Client`] whenever it returns an error,
+/// effectively becoming a reconnect handler.
 ///
-/// This function will only ever return if an [`Ok`][`Result::Ok`] value or a
-/// [`std::io::Error`] error is returned, returning that result.
+/// A return value of [`Ok`] means that `init` executed successfully and returned an
+/// [`Ok`] value.
+///
+/// # Errors
+/// If `init` returns a [`ReconnectError::Fatal`] variant, the inner error is returned.
 ///
 /// # Examples
 /// ```no_run
-/// use nt_client::{subscribe::ReceivedMessage, Client};
+/// use nt_client::{subscribe::ReceivedMessage, error::ReconnectError, Client};
 ///
 /// # tokio_test::block_on(async {
-/// nt_client::reconnect(|| async {
-///     let mut client = Client::new(Default::default());
-///
+/// nt_client::reconnect(Default::default(), |client| async {
 ///     let topic = client.topic("/topic");
 ///     let sub_task = tokio::spawn(async move {
 ///         let mut subscriber = topic.subscribe(Default::default()).await;
 ///
-///         while let Ok(ReceivedMessage::Updated((_, value))) = subscriber.recv().await {
-///             println!("updated: {value:?}");
-///         }
+///         loop {
+///             match subscriber.recv().await {
+///                 Ok(ReceivedMessage::Updated((_, value))) => println!("updated: {value:?}"),
+///                 Err(err) => return Err(err),
+///                 _ => {},
+///             }
+///         };
+///         Ok(())
 ///     });
 ///
 ///     // select! to make sure other tasks don't stay running
 ///     tokio::select! {
-///         res = client.connect() => res,
-///         _ = sub_task => Ok(()),
+///         res = client.connect() => Ok(res?),
+///         res = sub_task => res
+///             .map_err(|err| ReconnectError::Fatal(err.into()))?
+///             .map_err(|err| ReconnectError::Nonfatal(err.into())),
 ///     }
 /// }).await.unwrap();
 /// # })
 /// ```
-pub async fn reconnect<F, I>(mut init: I) -> Result<(), std::io::Error>
+pub async fn reconnect<F, I>(options: NewClientOptions, mut init: I) -> Result<(), Box<dyn Error + Send + Sync>>
 where
-    F: Future<Output = Result<(), ConnectError>>,
-    I: FnMut() -> F,
+    F: Future<Output = Result<(), ReconnectError>>,
+    I: FnMut(Client) -> F,
 {
     loop {
-        match init().await {
+        match init(Client::new(options.clone())).await {
             Ok(_) => return Ok(()),
-            Err(ConnectError::WebsocketError(tungstenite::Error::Io(err))) => {
+            Err(ReconnectError::Fatal(err)) => {
                 error!("fatal error occurred: {err}");
                 return Err(err);
             },
-            Err(err) => {
+            Err(ReconnectError::Nonfatal(err)) => {
                 error!("client crashed! {err}");
                 info!("attempting to reconnect");
             },
