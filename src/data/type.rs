@@ -90,6 +90,7 @@ macro_rules! transparent {
     (@ $t: ident, $($m: meta)*, $g: ty) => {
         $(#[$m])*
         pub struct $t(pub $g);
+
         impl From<$t> for $g {
             fn from(value: $t) -> Self {
                 value.0
@@ -98,6 +99,17 @@ macro_rules! transparent {
         impl From<$g> for $t {
             fn from(value: $g) -> Self {
                 Self(value)
+            }
+        }
+
+        impl AsRef<$g> for $t {
+            fn as_ref(&self) -> &$g {
+                &self.0
+            }
+        }
+        impl AsMut<$g> for $t {
+            fn as_mut(&mut self) -> &mut $g {
+                &mut self.0
             }
         }
 
