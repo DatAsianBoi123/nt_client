@@ -2,7 +2,7 @@
 //!
 //! Topics have a fixed data type and can be subscribed and published to.
 
-use std::{collections::{HashMap, VecDeque}, fmt::Display, ops::{Deref, DerefMut}, sync::Arc};
+use std::{collections::{HashMap, VecDeque}, fmt::Display, sync::Arc};
 
 use tokio::sync::RwLock;
 
@@ -263,16 +263,14 @@ impl From<VecDeque<String>> for TopicPath {
     }
 }
 
-impl Deref for TopicPath {
-    type Target = VecDeque<String>;
-
-    fn deref(&self) -> &Self::Target {
+impl AsRef<VecDeque<String>> for TopicPath {
+    fn as_ref(&self) -> &VecDeque<String> {
         &self.segments
     }
 }
 
-impl DerefMut for TopicPath {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+impl AsMut<VecDeque<String>> for TopicPath {
+    fn as_mut(&mut self) -> &mut VecDeque<String> {
         &mut self.segments
     }
 }
