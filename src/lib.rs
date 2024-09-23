@@ -1,4 +1,6 @@
 // TODO: add # Errors header on functions that apply
+// TODO: replace Debug impls with ones that contain actually useful info
+// TODO: into_ and _mut for getters
 
 #![warn(missing_docs)]
 
