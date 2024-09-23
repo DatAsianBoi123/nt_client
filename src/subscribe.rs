@@ -36,7 +36,7 @@
 //! client.connect().await.unwrap();
 //! # });
 
-use std::{collections::{HashMap, HashSet}, sync::Arc, time::Duration};
+use std::{collections::{HashMap, HashSet}, fmt::Debug, sync::Arc, time::Duration};
 
 use futures_util::future::join_all;
 use tokio::sync::{broadcast, RwLock};
@@ -52,7 +52,6 @@ use crate::{data::{BinaryData, ClientboundData, ClientboundTextData, Serverbound
 /// This will automatically get unsubscribed whenever this goes out of scope.
 ///
 /// [`Topic`]: crate::topic::Topic
-#[derive(Debug)]
 pub struct Subscriber {
     topics: Vec<String>,
     id: i32,
@@ -63,6 +62,17 @@ pub struct Subscriber {
 
     ws_sender: NTServerSender,
     ws_recv: NTClientReceiver,
+}
+
+impl Debug for Subscriber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Subscriber")
+            .field("topics", &self.topics)
+            .field("id", &self.id)
+            .field("options", &self.options)
+            .field("topic_ids", &self.topic_ids)
+            .finish()
+    }
 }
 
 impl PartialEq for Subscriber {

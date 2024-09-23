@@ -2,7 +2,7 @@
 //!
 //! Topics have a fixed data type and can be subscribed and published to.
 
-use std::{collections::{HashMap, VecDeque}, fmt::Display, sync::Arc};
+use std::{collections::{HashMap, VecDeque}, fmt::{Debug, Display}, sync::Arc};
 
 use tokio::sync::RwLock;
 
@@ -49,13 +49,21 @@ macro_rules! path {
 /// The intended method to obtain one of these is to use the [`Client::topic`] method.
 ///
 /// [`Client::topic`]: crate::Client::topic
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Topic {
     name: String,
     time: Arc<RwLock<NetworkTablesTime>>,
     announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
     send_ws: NTServerSender,
     recv_ws: NTClientSender,
+}
+
+impl Debug for Topic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Topic")
+            .field("name", &self.name)
+            .finish()
+    }
 }
 
 impl PartialEq for Topic {

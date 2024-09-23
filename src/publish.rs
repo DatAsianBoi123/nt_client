@@ -31,7 +31,7 @@
 //! client.connect().await.unwrap();
 //! # });
 
-use std::{marker::PhantomData, sync::Arc, time::Duration};
+use std::{fmt::Debug, marker::PhantomData, sync::Arc, time::Duration};
 
 use tokio::sync::{broadcast, RwLock};
 use tracing::debug;
@@ -43,12 +43,20 @@ use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, BinaryData, C
 /// This will automatically get unpublished whenever this goes out of scope.
 ///
 /// [`Topic`]: crate::topic::Topic
-#[derive(Debug)]
 pub struct Publisher<T: NetworkTableData> {
     _phantom: PhantomData<T>,
     id: i32,
     time: Arc<RwLock<NetworkTablesTime>>,
     ws_sender: NTServerSender,
+}
+
+impl<T: NetworkTableData> Debug for Publisher<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Publisher")
+            .field("id", &self.id)
+            .field("type", &T::data_type())
+            .finish()
+    }
 }
 
 impl<T: NetworkTableData> PartialEq for Publisher<T> {

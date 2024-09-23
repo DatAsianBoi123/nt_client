@@ -1,5 +1,4 @@
 // TODO: add # Errors header on functions that apply
-// TODO: replace Debug impls with ones that contain actually useful info
 // TODO: into_ and _mut for getters
 
 #![warn(missing_docs)]
@@ -36,7 +35,7 @@
 //! [NetworkTables]: https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc
 
 use core::panic;
-use std::{collections::{HashMap, VecDeque}, convert::Into, error::Error, net::Ipv4Addr, sync::Arc, time::{Duration, Instant}};
+use std::{collections::{HashMap, VecDeque}, convert::Into, error::Error, fmt::Debug, net::Ipv4Addr, sync::Arc, time::{Duration, Instant}};
 
 use data::{BinaryData, ClientboundData, ClientboundTextData, ServerboundMessage, Unannounce};
 use error::{ConnectError, ConnectionClosedError, IntoAddrError, PingError, ReceiveMessageError, ReconnectError, SendMessageError, UpdateTimeError};
@@ -63,7 +62,6 @@ pub(crate) type NTClientReceiver = broadcast::Receiver<Arc<ClientboundData>>;
 ///
 /// When this goes out of scope, the websocket connection is closed and no attempts to reconnect
 /// will be made.
-#[derive(Debug)]
 pub struct Client {
     addr: Ipv4Addr,
     options: NewClientOptions,
@@ -72,6 +70,15 @@ pub struct Client {
 
     send_ws: (NTServerSender, NTServerReceiver),
     recv_ws: (NTClientSender, NTClientReceiver),
+}
+
+impl Debug for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Client")
+            .field("options", &self.options)
+            .field("topics", &self.announced_topics)
+            .finish()
+    }
 }
 
 impl Client {
