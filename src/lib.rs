@@ -1,5 +1,6 @@
 // TODO: add # Errors header on functions that apply
 // TODO: into_ and _mut for getters
+// TODO: more examples (path!, TopicCollection)
 
 #![warn(missing_docs)]
 
