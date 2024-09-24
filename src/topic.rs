@@ -341,7 +341,8 @@ impl From<&Announce> for AnnouncedTopic {
 /// ```
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TopicPath {
-    segments: VecDeque<String>,
+    /// The segments contained in the path.
+    pub segments: VecDeque<String>,
 }
 
 impl TopicPath {
@@ -357,18 +358,6 @@ impl TopicPath {
 impl From<VecDeque<String>> for TopicPath {
     fn from(value: VecDeque<String>) -> Self {
         Self { segments: value }
-    }
-}
-
-impl AsRef<VecDeque<String>> for TopicPath {
-    fn as_ref(&self) -> &VecDeque<String> {
-        &self.segments
-    }
-}
-
-impl AsMut<VecDeque<String>> for TopicPath {
-    fn as_mut(&mut self) -> &mut VecDeque<String> {
-        &mut self.segments
     }
 }
 
