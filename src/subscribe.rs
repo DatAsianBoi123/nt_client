@@ -36,7 +36,7 @@
 //! client.connect().await.unwrap();
 //! # });
 
-use std::{collections::{HashMap, HashSet}, fmt::Debug, sync::Arc, time::Duration};
+use std::{collections::{HashMap, HashSet}, fmt::Debug, sync::Arc};
 
 use futures_util::future::join_all;
 use tokio::sync::{broadcast, RwLock};
@@ -57,7 +57,6 @@ pub struct Subscriber {
     id: i32,
     options: SubscriptionOptions,
     topic_ids: Arc<RwLock<HashSet<i32>>>,
-    prev_timestamp: Arc<RwLock<Option<Duration>>>,
     announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
 
     ws_sender: NTServerSender,
@@ -111,7 +110,6 @@ impl Subscriber {
             id,
             options,
             topic_ids: Arc::new(RwLock::new(topic_ids)),
-            prev_timestamp: Default::default(),
             announced_topics,
             ws_sender,
             ws_recv
@@ -139,7 +137,6 @@ impl Subscriber {
     pub async fn recv(&mut self) -> Result<ReceivedMessage, broadcast::error::RecvError> {
         recv_until_async(&mut self.ws_recv, |data| {
             let topic_ids = self.topic_ids.clone();
-            let prev_timestamp = self.prev_timestamp.clone();
             let announced_topics = self.announced_topics.clone();
             let sub_id = self.id;
             let topics = &self.topics;
@@ -151,17 +148,16 @@ impl Subscriber {
                             topic_ids.read().await.contains(&id)
                         };
                         if !contains { return None; };
-                        if prev_timestamp.read().await.is_some_and(|last_timestamp| last_timestamp > *timestamp) { return None; };
-
-                        {
-                            let mut prev_timestamp = prev_timestamp.write().await;
-                            *prev_timestamp = Some(*timestamp);
-                        }
-                        debug!("[sub {}] updated: {data}", sub_id);
                         let announced_topic = {
-                            let topics = announced_topics.read().await;
-                            topics.get(&id).expect("announced topic before sending updates").clone()
+                            let mut topics = announced_topics.write().await;
+                            let topic = topics.get_mut(&id).expect("announced topic before sending updates");
+
+                            if topic.last_updated().is_some_and(|last_timestamp| last_timestamp > timestamp) { return None; };
+                            topic.update(*timestamp);
+
+                            topic.clone()
                         };
+                        debug!("[sub {}] updated: {data}", sub_id);
                         Some(ReceivedMessage::Updated((announced_topic, data.clone())))
                     },
                     ClientboundData::Text(ClientboundTextData::Announce(ref announce)) => {

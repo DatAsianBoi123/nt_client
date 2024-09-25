@@ -2,7 +2,7 @@
 //!
 //! Topics have a fixed data type and can be subscribed and published to.
 
-use std::{collections::{HashMap, VecDeque}, fmt::{Debug, Display}, sync::Arc};
+use std::{collections::{HashMap, VecDeque}, fmt::{Debug, Display}, sync::Arc, time::Duration};
 
 use tokio::sync::RwLock;
 
@@ -210,6 +210,7 @@ pub struct AnnouncedTopic {
     id: i32,
     r#type: DataType,
     properties: Properties,
+    last_updated: Option<Duration>,
 }
 
 impl AnnouncedTopic {
@@ -235,6 +236,15 @@ impl AnnouncedTopic {
         &self.properties
     }
 
+    /// Returns when this topic was last updated as a duration of time since the server started.
+    pub fn last_updated(&self) -> Option<&Duration> {
+        self.last_updated.as_ref()
+    }
+
+    pub(crate) fn update(&mut self, when: Duration) {
+        self.last_updated = Some(when);
+    }
+
     /// Returns whether the given topic names and subscription options match this topic.
     pub fn matches(&self, names: &[String], options: &SubscriptionOptions) -> bool {
         names.iter()
@@ -249,6 +259,7 @@ impl From<&Announce> for AnnouncedTopic {
             id: value.id,
             r#type: value.r#type.clone(),
             properties: value.properties.clone(),
+            last_updated: None,
         }
     }
 }
