@@ -139,6 +139,7 @@ pub struct Properties {
     /// Extra property values.
     ///
     /// This should be used for generic properties not officially recognized by a `NetworkTables` server.
+    // TODO: remove Option wrapper
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub extra: Option<HashMap<String, String>>
 }

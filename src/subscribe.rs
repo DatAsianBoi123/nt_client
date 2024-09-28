@@ -134,6 +134,7 @@ impl Subscriber {
     ///
     /// Topics that have already been announced will not be received by this method. To view
     /// all topics that are being subscribed to, use the [`topics`][`Self::topics`] method.
+    // TODO: probably replace with custom error type
     pub async fn recv(&mut self) -> Result<ReceivedMessage, broadcast::error::RecvError> {
         recv_until_async(&mut self.ws_recv, |data| {
             let topic_ids = self.topic_ids.clone();

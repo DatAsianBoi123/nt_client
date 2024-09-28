@@ -137,6 +137,7 @@ impl<T: NetworkTableData> Drop for Publisher<T> {
 pub enum NewPublisherError {
     /// An error occurred when receiving data from the connection.
     #[error(transparent)]
+    // TODO: probably replace with custom error
     Recv(#[from] broadcast::error::RecvError),
     /// The server and client have mismatched data types.
     ///
