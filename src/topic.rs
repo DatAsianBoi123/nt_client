@@ -179,12 +179,12 @@ impl TopicCollection {
     }
 
     /// Returns a slice of topic names this collection contains.
-    pub fn names(&self) -> &[String] {
+    pub fn names(&self) -> &Vec<String> {
         &self.names
     }
 
     /// Returns a mutable slice of topic names this collection contains.
-    pub fn names_mut(&mut self) -> &mut [String] {
+    pub fn names_mut(&mut self) -> &mut Vec<String> {
         &mut self.names
     }
 
