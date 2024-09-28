@@ -8,7 +8,6 @@ use tokio::sync::RwLock;
 
 use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::Subscriber, NTClientSender, NTServerSender, NetworkTablesTime};
 
-#[macro_export]
 /// Creates a [`TopicPath`] containing the segments.
 ///
 /// `path!` allows for the easy creation of [`TopicPath`]s without having to deal with creating
@@ -27,6 +26,7 @@ use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, Properties, S
 /// 
 /// assert_eq!(path!["my", "path"], path);
 /// ```
+#[macro_export]
 macro_rules! path {
     () => {
         $crate::topic::TopicPath::default();
