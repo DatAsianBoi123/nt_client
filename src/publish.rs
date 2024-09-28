@@ -286,10 +286,8 @@ impl SetPropsBuilder {
             .set_retained(retained)
             .set_cached(cached);
 
-        if let Some(extra) = extra {
-            for (key, value) in extra {
-                builder = builder.replace(key, value);
-            }
+        for (key, value) in extra {
+            builder = builder.replace(key, value);
         }
 
         builder
@@ -334,9 +332,7 @@ impl SetPropsBuilder {
         replace_or_unchange!(map += ("retained", retained));
         replace_or_unchange!(map += ("cached", cached));
 
-        if let Some(extra) = extra {
-            map.extend(extra.into_iter().map(|(key, value)| (key, Some(value))));
-        }
+        map.extend(extra.into_iter().map(|(key, value)| (key, Some(value))));
 
         Self { inner: map }
     }
