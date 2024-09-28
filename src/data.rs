@@ -42,7 +42,7 @@ pub(crate) struct Unpublish {
 #[derive(Serialize, Debug)]
 pub(crate) struct SetProperties {
     pub name: String,
-    pub update: Properties,
+    pub update: HashMap<String, Option<String>>,
 }
 
 #[derive(Serialize, Debug)]

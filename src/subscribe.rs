@@ -179,8 +179,6 @@ impl Subscriber {
             }
         }).await
     }
-
-    // TODO: update method
 }
 
 impl Drop for Subscriber {
