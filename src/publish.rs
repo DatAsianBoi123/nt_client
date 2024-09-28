@@ -265,6 +265,8 @@ impl SetPropsBuilder {
     ///
     /// # Examples
     /// ```
+    /// use nt_client::{data::Properties, publish::SetPropsBuilder};
+    ///
     /// // properties are:
     /// // - persistent: `true`
     /// // - cached: `true`
@@ -306,6 +308,8 @@ impl SetPropsBuilder {
     ///
     /// # Examples
     /// ```
+    /// use nt_client::{data::Properties, publish::SetPropsBuilder};
+    ///
     /// // properties are:
     /// // - persistent: `true`
     /// // - cached: `true`
