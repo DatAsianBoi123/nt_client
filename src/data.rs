@@ -140,7 +140,7 @@ pub struct Properties {
     ///
     /// This should be used for generic properties not officially recognized by a `NetworkTables` server.
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub extra: Option<HashMap<String, serde_json::Value>>
+    pub extra: Option<HashMap<String, String>>
 }
 
 /// Options to use when subscribing to a topic.
