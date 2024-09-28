@@ -102,17 +102,6 @@ macro_rules! transparent {
             }
         }
 
-        impl AsRef<$g> for $t {
-            fn as_ref(&self) -> &$g {
-                &self.0
-            }
-        }
-        impl AsMut<$g> for $t {
-            fn as_mut(&mut self) -> &mut $g {
-                &mut self.0
-            }
-        }
-
         #[allow(clippy::from_over_into)]
         impl Into<rmpv::Value> for $t {
             fn into(self) -> rmpv::Value {
