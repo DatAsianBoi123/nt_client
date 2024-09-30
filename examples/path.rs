@@ -1,4 +1,4 @@
-//! An example of using TopicPaths
+//! An example of using TopicPaths.
 
 use std::time::Duration;
 
