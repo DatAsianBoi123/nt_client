@@ -318,7 +318,7 @@ impl SetPropsBuilder {
     /// // - set `persistent` to `true`
     /// // - set `cached` to `true`
     /// // everything else stays unchanged
-    /// let builder = SetPropsBuilder::with_props_delete(properties);
+    /// let builder = SetPropsBuilder::with_props_unchanged(properties);
     /// ```
     pub fn with_props_unchange(Properties { persistent, retained, cached, extra }: Properties) -> Self {
         macro_rules! replace_or_unchange {
