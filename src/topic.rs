@@ -8,6 +8,8 @@ use tokio::sync::RwLock;
 
 use crate::{data::{r#type::{DataType, NetworkTableData}, Announce, Properties, SubscriptionOptions}, publish::{NewPublisherError, Publisher}, subscribe::Subscriber, NTClientSender, NTServerSender, NetworkTablesTime};
 
+pub mod collection;
+
 /// Creates a [`TopicPath`] containing the segments.
 ///
 /// `path!` allows for the easy creation of [`TopicPath`]s without having to deal with creating
@@ -114,87 +116,6 @@ impl Topic {
     /// [`Client`]: crate::Client
     pub async fn subscribe(&self, options: SubscriptionOptions) -> Subscriber {
         Subscriber::new(vec![self.name.clone()], options, self.announced_topics.clone(), self.send_ws.clone(), self.recv_ws.subscribe()).await
-    }
-}
-
-// TODO: make iterators for TopicCollection
-
-/// Represents a collection of topics.
-///
-/// This is used to subscribe to multiple topics at once.
-///
-/// # Examples
-/// ```
-/// use nt_client::Client;
-///
-/// # tokio_test::block_on(async {
-///     let client = Client::new(Default::default());
-///
-///     let topics = client.topics(vec![
-///         "/topic".to_owned(),
-///         "/nested/topic".to_owned(),
-///         "/deeply/nested/topic".to_owned(),
-///     ]);
-///     tokio::spawn(async move {
-///         let subscriber = topics.subscribe::<i32>(Default::default()).await;
-///
-///         // do something with subscriber...
-///     });
-///
-///     client.connect().await
-/// # });
-/// ```
-#[derive(Clone)]
-pub struct TopicCollection {
-    names: Vec<String>,
-    announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
-    send_ws: NTServerSender,
-    recv_ws: NTClientSender,
-}
-
-impl Debug for TopicCollection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TopicCollection")
-            .field("topics", &self.names)
-            .finish()
-    }
-}
-
-impl PartialEq for TopicCollection {
-    fn eq(&self, other: &Self) -> bool {
-        self.names == other.names
-    }
-}
-
-impl Eq for TopicCollection { }
-
-impl TopicCollection {
-    pub(super) fn new(
-        names: Vec<String>,
-        announced_topics: Arc<RwLock<HashMap<i32, AnnouncedTopic>>>,
-        send_ws: NTServerSender,
-        recv_ws: NTClientSender
-    ) -> Self {
-        Self { names, announced_topics, send_ws, recv_ws }
-    }
-
-    /// Returns a slice of topic names this collection contains.
-    pub fn names(&self) -> &Vec<String> {
-        &self.names
-    }
-
-    /// Returns a mutable slice of topic names this collection contains.
-    pub fn names_mut(&mut self) -> &mut Vec<String> {
-        &mut self.names
-    }
-
-    /// Subscribes to this collection of topics.
-    ///
-    /// This method does not require the [`Client`] websocket connection to be made.
-    ///
-    /// [`Client`]: crate::Client
-    pub async fn subscribe<T: NetworkTableData>(&self, options: SubscriptionOptions) -> Subscriber {
-        Subscriber::new(self.names.clone(), options, self.announced_topics.clone(), self.send_ws.clone(), self.recv_ws.subscribe()).await
     }
 }
 

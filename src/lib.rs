@@ -43,7 +43,7 @@ use futures_util::{stream::{SplitSink, SplitStream}, Future, SinkExt, StreamExt,
 use time::ext::InstantExt;
 use tokio::{net::TcpStream, select, sync::{broadcast, mpsc, Notify, RwLock}, task::JoinHandle, time::{interval, timeout}};
 use tokio_tungstenite::{tungstenite::{self, http::{Response, Uri}, ClientRequestBuilder, Message}, MaybeTlsStream, WebSocketStream};
-use topic::{AnnouncedTopic, Topic, TopicCollection};
+use topic::{collection::TopicCollection, AnnouncedTopic, Topic};
 use tracing::{debug, error, info};
 
 pub mod error;
@@ -124,7 +124,7 @@ impl Client {
 
     /// Returns a new collection of topics with the given names.
     pub fn topics(&self, names: Vec<String>) -> TopicCollection {
-        TopicCollection::new(names, self.announced_topics.clone(), self.send_ws.0.clone(), self.recv_ws.0.clone())
+        TopicCollection::new(names, self.time(), self.announced_topics.clone(), self.send_ws.0.clone(), self.recv_ws.0.clone())
     }
 
     /// Connects to the `NetworkTables` server.
