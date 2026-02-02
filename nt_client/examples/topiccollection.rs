@@ -11,7 +11,7 @@ async fn main() {
 
 fn setup(client: &Client) {
     let topic_names = vec!["/topic1".to_owned(), "/topic2".to_owned(), "topic3".to_owned()];
-    let topics = client.topics(topic_names.clone());
+    let topics = client.topics(topic_names);
 
     // loop over topics in the collection
     for topic in topics.clone() {

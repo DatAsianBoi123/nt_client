@@ -1,6 +1,6 @@
 //! An example of using a reconnect handler.
 
-use nt_client::{data::NetworkTableData, error::ReconnectError, subscribe::ReceivedMessage};
+use nt_client::{data::{DataType, NetworkTableData}, error::ReconnectError, subscribe::ReceivedMessage};
 
 #[tokio::main]
 async fn main() {
@@ -16,8 +16,13 @@ async fn main() {
             loop {
                 match subscriber.recv().await {
                     Ok(ReceivedMessage::Updated((topic, value))) => {
-                        let value = String::from_value(value).expect("updated value is a string");
-                        println!("topic {} updated to {value}", topic.name());
+                        match topic.r#type() {
+                            DataType::String => {
+                                let value = String::from_value(value).expect("updated value is a string");
+                                println!("topic {} updated to {value}", topic.name());
+                            },
+                            _ => eprintln!("not a string"),
+                        }
                     },
                     Err(err) => return Err(ReconnectError::Nonfatal(err.into())),
                     _ => {},

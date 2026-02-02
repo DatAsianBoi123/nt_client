@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use nt_client::{Client, NTAddr, NewClientOptions, data::NetworkTableData, subscribe::ReceivedMessage};
+use nt_client::{Client, NTAddr, NewClientOptions, data::{DataType, NetworkTableData}, subscribe::ReceivedMessage};
 use tracing::level_filters::LevelFilter;
 
 #[tokio::main]
@@ -12,6 +12,7 @@ async fn main() {
         .init();
 
     let client = Client::new(NewClientOptions { 
+        // if connecting to a real robot, use `NTAddr::TeamNumber` instead.
         addr: NTAddr::Local,
         secure_port: None,
         ..Default::default()
@@ -31,9 +32,9 @@ fn setup(client: &Client) {
             match subscriber.recv().await {
                 Ok(ReceivedMessage::Announced(topic)) => println!("announced topic: {}", topic.name()),
                 Ok(ReceivedMessage::Updated((topic, value))) => {
-                    match String::from_value(value) {
-                        Some(string) => println!("topic {} updated to {string}", topic.name()),
-                        None => eprintln!("not a string"),
+                    match topic.r#type() {
+                        DataType::String => println!("topic {} updated to {}", topic.name(), String::from_value(value).expect("is a valid string")),
+                        _ => eprintln!("not a string"),
                     }
                 },
                 Ok(ReceivedMessage::Unannounced { name, .. }) => {
