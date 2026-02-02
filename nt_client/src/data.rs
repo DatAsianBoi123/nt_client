@@ -333,11 +333,6 @@ transparent!(
     #[derive(Debug, Clone, PartialEq, Eq)]
     Rpc: vec u8
 );
-transparent!(
-    /// Raw protobuf data.
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    Protobuf: vec u8
-);
 
 impl_data_type!(bool [vec => BooleanArray] => Boolean; value @ value.as_bool());
 impl_data_type!(f64 [vec => DoubleArray] => Double; value @ value.as_f64());
