@@ -353,12 +353,11 @@ impl_data_type!(String [vec => StringArray] => String; value @ if let rmpv::Valu
 impl_data_type!(JsonString => Json; value @ String::from_value(value).map(Self));
 impl_data_type!(bytes RawData => Raw);
 impl_data_type!(bytes Rpc => Rpc);
-impl_data_type!(rmpv::Value => Msgpack; value @ Some(value.clone()));
+impl_data_type!(rmpv::Value => Msgpack; value @ Some(value));
 
 /// Clients connected to the `NetworkTables` server.
 ///
 /// The server will publish these to the meta topic `$clients`.
-// TODO: example for all meta topic data
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectedClients {
     /// The connected clients.

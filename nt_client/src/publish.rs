@@ -177,8 +177,6 @@ impl<T: NetworkTableData> Publisher<T> {
     /// Updates the properties of the topic being subscribed to, returning a `future` that
     /// completes when the server acknowledges the update.
     ///
-    /// A [`UpdateProps`] should be used for easy creation of updated properties.
-    ///
     /// # Errors
     /// Returns an error if messages could not be received from the `NetworkTables` server.
     ///
@@ -350,8 +348,6 @@ impl GenericPublisher {
 
     /// Updates the properties of the topic being subscribed to, returning a `future` that
     /// completes when the server acknowledges the update.
-    ///
-    /// A [`UpdateProps`] should be used for easy creation of updated properties.
     ///
     /// # Errors
     /// Returns an error if messages could not be received from the `NetworkTables` server.
