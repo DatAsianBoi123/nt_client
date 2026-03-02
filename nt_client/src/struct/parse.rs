@@ -94,12 +94,15 @@ impl TokenStream {
 pub struct ParsedStruct {
     /// The declarations in the struct.
     pub declarations: Vec<StructDeclaration>,
+    /// Dependencies of this struct.
+    pub deps: Vec<String>,
 }
 
 impl ParsedStruct {
     /// Parses a stream of tokens into a `ParsedStruct`, as described [here](https://github.com/wpilibsuite/allwpilib/blob/main/wpiutil/doc/struct.adoc).
     pub fn parse_tokens(tokens: &mut TokenStream) -> Result<Self, ParseTokensError> {
         let mut declarations = Vec::new();
+        let mut deps = Vec::new();
 
         declarations.push(StructDeclaration::parse_tokens(tokens)?);
         while tokens.has_remaining() {
@@ -113,10 +116,14 @@ impl ParsedStruct {
             }
             if !tokens.has_remaining() { break; };
 
-            declarations.push(StructDeclaration::parse_tokens(tokens)?);
+            let declaration = StructDeclaration::parse_tokens(tokens)?;
+            if let TypeName::Struct(dep) = declaration.type_name() {
+                deps.push(dep.clone());
+            }
+            declarations.push(declaration);
         }
 
-        Ok(ParsedStruct { declarations })
+        Ok(ParsedStruct { declarations, deps })
     }
 
     /// Reads this struct from byte data.
@@ -737,11 +744,11 @@ mod tests {
 
         assert_eq!(parse_schema("bool value"), Ok(ParsedStruct { declarations: vec![
             S::Standard(StandardDeclaration { enum_spec: None, r#type: TypeName::Bool, name: "value".to_owned(), array_size: None }),
-        ] }));
+        ], deps: Vec::new() }));
 
         assert_eq!(parse_schema("double array[4]"), Ok(ParsedStruct { declarations: vec![
             S::Standard(StandardDeclaration { enum_spec: None, r#type: TypeName::F64, name: "array".to_owned(), array_size: Some(4) }),
-        ] }));
+        ], deps: Vec::new() }));
 
         assert_eq!(parse_schema("enum {a=1, b=2} int8 val"), Ok(ParsedStruct { declarations: vec![
             S::Standard(StandardDeclaration {
@@ -750,7 +757,7 @@ mod tests {
                 name: "val".to_owned(),
                 array_size: None,
             }),
-        ] }));
+        ], deps: Vec::new() }));
 
         assert_eq!(parse_schema("enum {a=1,b=2,} int8 val"), Ok(ParsedStruct { declarations: vec![
             S::Standard(StandardDeclaration {
@@ -759,7 +766,7 @@ mod tests {
                 name: "val".to_owned(),
                 array_size: None,
             }),
-        ] }));
+        ], deps: Vec::new() }));
 
         assert_eq!(parse_schema("uint16 value:5"), Ok(ParsedStruct { declarations: vec![
             S::Bitfield(BitfieldDeclaration {
@@ -768,7 +775,7 @@ mod tests {
                 name: "value".to_owned(),
                 bits: 5,
             }),
-        ] }));
+        ], deps: Vec::new() }));
 
         assert_eq!(parse_schema("uint16 value:5;{a=1,b=2} uint16 other;;bool flag;;;"), Ok(ParsedStruct { declarations: vec![
             S::Bitfield(BitfieldDeclaration {
@@ -789,7 +796,7 @@ mod tests {
                 name: "flag".to_owned(),
                 array_size: None,
             }),
-        ] }));
+        ], deps: Vec::new() }));
     }
 
     #[test]
