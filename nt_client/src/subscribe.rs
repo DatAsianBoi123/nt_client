@@ -42,6 +42,7 @@
 use std::{collections::{HashMap, HashSet}, fmt::Debug, sync::Arc, time::Duration};
 
 use futures_util::future::join_all;
+use rmpv::Utf8String;
 use serde::{Serialize, Serializer};
 use tokio::sync::{broadcast, RwLock};
 use tracing::warn;
@@ -266,16 +267,28 @@ impl SubscriptionOptions {
         let mut all = None;
         let mut topics_only = None;
         let mut prefix = None;
-        let extra = HashMap::new();
+        let mut extra = HashMap::new();
 
         for (key, value) in map {
-            match key.as_str()? {
-                "periodic" => periodic = value.as_u64().map(Duration::from_secs),
-                "all" => all = value.as_bool(),
-                "topicsonly" => topics_only = value.as_bool(),
-                "prefix" => prefix = value.as_bool(),
-                // TODO: rmpv value to json value
-                _ => todo!(),
+            let key = if let rmpv::Value::String(key) = key {
+                if let Some(key) = key.into_str() {
+                    key
+                } else {
+                    warn!("key has non-utf8 characters");
+                    continue;
+                }
+            } else {
+                warn!("non-string key for subscription option {key:?}");
+                continue;
+            };
+            match (key.as_ref(), value) {
+                ("periodic", rmpv::Value::Integer(int)) if int.is_u64() => periodic = int.as_u64().map(Duration::from_secs),
+                ("all", rmpv::Value::Boolean(bool)) => all = Some(bool),
+                ("topicsonly", rmpv::Value::Boolean(bool)) => topics_only = Some(bool),
+                ("prefix", rmpv::Value::Boolean(bool)) => prefix = Some(bool),
+                (_, value) => {
+                    extra.insert(key, Self::value_from_msgpack(value)?);
+                }
             }
         }
 
@@ -303,8 +316,57 @@ impl SubscriptionOptions {
         if let Some(prefix) = self.prefix {
             map.push((rmpv::Value::String("prefix".into()), rmpv::Value::Boolean(prefix)));
         };
-        // TODO: json value to rmpv value
+        for (key, value) in self.extra {
+            map.push((rmpv::Value::String(Utf8String::from(key)), Self::value_into_msgpack(value)));
+        }
         map
+    }
+
+    fn value_from_msgpack(value: rmpv::Value) -> Option<serde_json::Value> {
+        match value {
+            rmpv::Value::Nil => Some(serde_json::Value::Null),
+            rmpv::Value::Integer(int) if int.is_u64() => {
+                Some(serde_json::Value::Number(serde_json::Number::from_u128(int.as_u64().expect("int is a u64") as u128).expect("number fits within a u64")))
+            },
+            rmpv::Value::Integer(int) /* if int.is_i64() */ => {
+                Some(serde_json::Value::Number(serde_json::Number::from_i128(int.as_i64().expect("int is a i64") as i128).expect("number fits within a i64")))
+            },
+            rmpv::Value::F64(f64) => Some(serde_json::Value::Number(serde_json::Number::from_f64(f64)?)),
+            rmpv::Value::F32(f32) => Some(serde_json::Value::Number(serde_json::Number::from_f64(f32 as f64)?)),
+            rmpv::Value::Boolean(bool) => Some(serde_json::Value::Bool(bool)),
+            rmpv::Value::String(str) => Some(serde_json::Value::String(str.into_str()?)),
+            rmpv::Value::Array(array) => Some(serde_json::Value::Array(array.into_iter()
+                .map(Self::value_from_msgpack)
+                .collect::<Option<_>>()?)),
+            rmpv::Value::Map(map) => Some(serde_json::Value::Object(map.into_iter()
+                .map(|(key, value)| {
+                    let key = if let rmpv::Value::String(key) = key {
+                        key.into_str()?
+                    } else {
+                        return None;
+                    };
+                    Self::value_from_msgpack(value).map(|value| (key, value))
+                })
+                .collect::<Option<_>>()?)),
+            _ => None,
+        }
+    }
+
+    fn value_into_msgpack(value: serde_json::Value) -> rmpv::Value {
+        match value {
+            serde_json::Value::Null => rmpv::Value::Nil,
+            serde_json::Value::Bool(bool) => rmpv::Value::Boolean(bool),
+            serde_json::Value::Number(number) if number.is_i64() => rmpv::Value::Integer(rmpv::Integer::from(number.as_i64().expect("number is i64"))),
+            serde_json::Value::Number(number) if number.is_u64() => rmpv::Value::Integer(rmpv::Integer::from(number.as_u64().expect("number is u64"))),
+            serde_json::Value::Number(number) /* if number.is_f64() */ => rmpv::Value::F64(number.as_f64().expect("number is f64")),
+            serde_json::Value::String(string) => rmpv::Value::String(Utf8String::from(string)),
+            serde_json::Value::Array(values) => rmpv::Value::Array(values.into_iter()
+                .map(Self::value_into_msgpack)
+                .collect()),
+            serde_json::Value::Object(map) => rmpv::Value::Map(map.into_iter()
+                .map(|(key, value)| (rmpv::Value::String(Utf8String::from(key)), Self::value_into_msgpack(value)))
+                .collect()),
+        }
     }
 }
 
