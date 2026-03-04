@@ -28,6 +28,10 @@ required-features = ["struct", "math"]
 name = "protobuf"
 required-features = ["protobuf", "math"]
 
+[[example]]
+name = "schema"
+required-features = ["struct", "protobuf"]
+
 [dependencies]
 nt_client_macros = { path = "../nt_client_macros" }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
