@@ -104,7 +104,11 @@ impl ParsedStruct {
         let mut declarations = Vec::new();
         let mut deps = Vec::new();
 
-        declarations.push(StructDeclaration::parse_tokens(tokens)?);
+        let first_declaration = StructDeclaration::parse_tokens(tokens)?;
+        if let TypeName::Struct(dep) = first_declaration.type_name() {
+            deps.push(dep.clone());
+        }
+        declarations.push(first_declaration);
         while tokens.has_remaining() {
             match tokens.next_token()? {
                 Token::Semi => {},
