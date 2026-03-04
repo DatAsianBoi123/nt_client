@@ -39,7 +39,7 @@ serde_json = "1.0"
 thiserror = "2"
 time = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
-tokio-tungstenite = { version = "*", features = ["native-tls"] }
+tokio-tungstenite = { version = "*", features = ["rustls"] }
 tracing = "0.1"
 
 protobuf = { version = "3", optional = true }
