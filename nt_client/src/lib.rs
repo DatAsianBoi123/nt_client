@@ -299,14 +299,10 @@ impl ClientHandle {
         self.topic(format!("$pub${}", topic.to_string()))
     }
 
-    /// Returns a new schema manager, composed of `SchemaWriter` and `SchemaWatcher` halves.
+    /// Returns a new schema manager.
     #[cfg(any(feature = "struct", feature = "protobuf"))]
     pub fn schema_manager(&self) -> SchemaManager {
-        use std::collections::HashMap;
-
-        use tokio::sync::Mutex;
-
-        SchemaManager::new(Arc::new(Mutex::new(HashMap::new())), self.clone())
+        SchemaManager::new(self.clone())
     }
 }
 
