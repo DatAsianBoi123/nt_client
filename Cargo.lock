@@ -303,7 +303,7 @@ version = "0.4.0"
 dependencies = [
  "futures-util",
  "lazy_static",
- "nt_client_macros",
+ "nt_client_macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf",
  "protobuf-codegen",
  "protoc-bin-vendored",
@@ -324,6 +324,17 @@ dependencies = [
 [[package]]
 name = "nt_client_macros"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "nt_client_macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6b3f86b3cf67dda86e6a91d5be93b6f43f1e7ee1ba1d63409fa54b8405b1c9a"
 dependencies = [
  "proc-macro2",
  "quote",

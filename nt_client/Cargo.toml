@@ -33,7 +33,7 @@ name = "schema"
 required-features = ["struct", "protobuf"]
 
 [dependencies]
-nt_client_macros = { path = "../nt_client_macros" }
+nt_client_macros = { version = "0.1.0" }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 rand = "0.9"
 rmp-serde = "1.3"
