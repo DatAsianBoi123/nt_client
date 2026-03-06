@@ -4,6 +4,7 @@ version = "0.5.0"
 authors.workspace = true
 edition.workspace = true
 description = "A blazingly fast NetworkTables 4.1 client"
+readme = "../README.md"
 repository.workspace = true
 license.workspace = true
 keywords = ["wpi", "wpilib", "networktables", "NT"]
