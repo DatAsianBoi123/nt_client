@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use nt_client::{Client, data::DataType, schema::{ParseFromSchemaError, PublishSchemaError, SchemaManager}, r#struct::{StructData, StructSchema, byte::{ByteBuffer, ByteReader}}, subscribe::ReceivedMessage, topic::Properties};
 use protobuf::reflect::ReflectFieldRef;
-use tracing::Level;
 
 // create a struct to send to the server
 #[derive(Debug, Clone, Copy, PartialEq)]
