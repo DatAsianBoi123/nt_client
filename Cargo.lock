@@ -299,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "nt_client"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "futures-util",
  "lazy_static",

@@ -24,7 +24,7 @@ This is meant to be used within coprocessors that can send and receive data from
 ## Installation
 Add the following dependency to your `Cargo.toml`
 ```toml
-nt_client = "0.5.0"
+nt_client = "0.5"
 ```
 Or run the following command in your project root
 ```
