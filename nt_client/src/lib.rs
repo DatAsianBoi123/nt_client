@@ -1,4 +1,5 @@
 #![warn(missing_docs, rustdoc::missing_crate_level_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! A blazingly fast [NetworkTables 4.1][NetworkTables] client.
 //!

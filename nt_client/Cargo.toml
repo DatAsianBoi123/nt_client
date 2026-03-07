@@ -11,6 +11,10 @@ keywords = ["wpi", "wpilib", "networktables", "NT"]
 categories = ["api-bindings"]
 build = "build.rs"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lib]
 name = "nt_client"
 path = "src/lib.rs"
