@@ -234,7 +234,7 @@ impl ClientHandle {
     /// You should only subscribe to this topic, publishing will likely break other connected
     /// clients (if the server even allows it).
     ///
-    /// Received messages will have the type of [`Clients`](crate::data::type::ConnectedClients).
+    /// Received messages will have the type of [`Clients`](crate::data::ConnectedClients).
     pub fn clients_meta_topic(&self) -> Topic {
         self.topic("$clients")
     }
@@ -244,7 +244,7 @@ impl ClientHandle {
     /// You should only subscribe to this topic, publishing will likely break other connected
     /// clients (if the server even allows it).
     ///
-    /// Received messages will have the type of [`ClientSubscriptions`](crate::data::type::ClientSubscriptions).
+    /// Received messages will have the type of [`ClientSubscriptions`](crate::data::ClientSubscriptions).
     pub fn client_subs_meta_topic(&self, client_name: impl ToString) -> Topic {
         self.topic(format!("$clientsub${}", client_name.to_string()))
     }
@@ -254,7 +254,7 @@ impl ClientHandle {
     /// You should only subscribe to this topic, publishing will likely break other connected
     /// clients (if the server even allows it).
     ///
-    /// Received messages will have the type of [`ServerSubscriptions`](crate::data::type::ServerSubscriptions).
+    /// Received messages will have the type of [`ServerSubscriptions`](crate::data::ServerSubscriptions).
     pub fn server_subs_meta_topic(&self) -> Topic {
         self.topic("$serversub")
     }
@@ -264,7 +264,7 @@ impl ClientHandle {
     /// You should only subscribe to this topic, publishing will likely break other connected
     /// clients (if the server even allows it).
     ///
-    /// Received messages will have the type of [`Subscriptions`](crate::data::type::Subscriptions).
+    /// Received messages will have the type of [`Subscriptions`](crate::data::Subscriptions).
     pub fn topic_subs_meta_topic(&self, topic: impl ToString) -> Topic {
         self.topic(format!("$sub${}", topic.to_string()))
     }
@@ -274,7 +274,7 @@ impl ClientHandle {
     /// You should only subscribe to this topic, publishing will likely break other connected
     /// clients (if the server even allows it).
     ///
-    /// Received messages will have the type of [`ClientPublishers`](crate::data::type::ClientPublishers).
+    /// Received messages will have the type of [`ClientPublishers`](crate::data::ClientPublishers).
     pub fn client_pubs_meta_topic(&self, client_name: impl ToString) -> Topic {
         self.topic(format!("$clientpub${}", client_name.to_string()))
     }
@@ -284,7 +284,7 @@ impl ClientHandle {
     /// You should only subscribe to this topic, publishing will likely break other connected
     /// clients (if the server even allows it).
     ///
-    /// Received messages will have the type of [`ServerPublishers`](crate::data::type::ServerPublishers).
+    /// Received messages will have the type of [`ServerPublishers`](crate::data::ServerPublishers).
     pub fn server_pubs_meta_topic(&self) -> Topic {
         self.topic("$serverpub")
     }
@@ -294,7 +294,7 @@ impl ClientHandle {
     /// You should only subscribe to this topic, publishing will likely break other connected
     /// clients (if the server even allows it).
     ///
-    /// Received messages will have the type of [`Publishers`](crate::data::type::Publishers).
+    /// Received messages will have the type of [`Publishers`](crate::data::Publishers).
     pub fn topic_pubs_meta_topic(&self, topic: impl ToString) -> Topic {
         self.topic(format!("$pub${}", topic.to_string()))
     }
